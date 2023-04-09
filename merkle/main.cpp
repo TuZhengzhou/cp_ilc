@@ -234,6 +234,7 @@ int main(int argc, char* argv[]) {
             mk << *(binToHex<HashT>(path[i])) << " ";
         mk << std::endl;
         mk << "root: " << *(binToHex<HashT>(root));      //Write out root
+        mk.close();
     } else if (std::string(argv[1]) == std::string("setup")) {
         auto keypair = generate_read_keypair<ppzksnark_ppT, FieldT, HashT>(tree_depth);
         std::fstream pk("merkle_pk.raw", std::ios_base::out);

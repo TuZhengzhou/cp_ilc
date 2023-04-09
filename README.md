@@ -23,7 +23,11 @@ The example shows how to generate proof for one merkle path on one merkle tree w
 ```
 Record down the root information, which is used on verify.
 
+for example:
+run ./merkle prove 1 2 3 4 5 6 7 8 7
+will output: root is f171e00bb40c83de1f09c64e2cc4558e3c327aa9e8525a467c83576071bc1045
+
 5/ verify
 ```
-./merkle [root]
+./merkle verify [root]
 ```

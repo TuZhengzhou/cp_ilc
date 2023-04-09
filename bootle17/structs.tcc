@@ -336,9 +336,9 @@ void row_vector_matrix<FieldT>::add_row_vector(const row_vector<FieldT>& row_vec
 }
 
 template<typename FieldT>
-void row_vector_matrix<FieldT>::set_item(const size_t row_num, const size_t col_num, const FieldT& val) {
-    assert(row_num < this->get_row_num() && col_num < this->get_column_num());
-    this->matrix[row_num].contents[col_num] = val;
+void row_vector_matrix<FieldT>::set_item(const size_t row_idx, const size_t col_idx, const FieldT& val) {
+    assert(row_idx < this->get_row_num() && col_idx < this->get_column_num());
+    this->matrix[row_idx].contents[col_idx] = val;
 }
 
 template<typename FieldT>
@@ -426,6 +426,24 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::random(const size_t row_num
     row_vector_matrix<FieldT> result(col_num);
     for (size_t i = 0; i < row_num; i++) {
         result.add_row_vector(row_vector<FieldT>::random(col_num));
+    }
+    return result;
+}
+
+template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::shift() const {
+    
+    size_t row_num = this->get_row_num();
+    size_t col_num = this->get_column_num();
+    row_vector_matrix<FieldT> result = row_vector_matrix<FieldT>::all_one(row_num, col_num);
+    
+    for (size_t row = 0; row < row_num; row++) {
+        for (size_t col = 0; col < col_num - 1; col++) {
+            result.set_item(row, col+1, this->get_item(row, col));
+        }
+        if (row + 1 < row_num) {
+            result.set_item(row+1, 0, this->get_item(row, col_num-1));
+        }
     }
     return result;
 }

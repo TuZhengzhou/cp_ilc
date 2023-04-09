@@ -2,29 +2,44 @@ set(CMAKE_CXX_STANDARD 14)
 
 # add_definitions(-DCURVE=BN128)
 find_package(OpenSSL REQUIRED)
-include_directories(/usr/local/include)
-include_directories(../libsnark)
-include_directories(../libsnark/depends/libfqfft/)
+
+# include_directories(/usr/local/include)
+# include_directories(../libsnark)
+# include_directories(../libsnark/depends/libfqfft/)
 include_directories(../libsnark/depends/libff/)
+
 link_directories(/usr/local/lib)
 
-add_executable(bootle17 
-    main.cpp)
+add_executable(
+    bootle17
 
-target_link_libraries(bootle17 ff)
-target_link_libraries(bootle17 gmpxx)
-target_link_libraries(bootle17 gmp)
-target_link_libraries(bootle17 procps)
-target_link_libraries(bootle17 OpenSSL::Crypto)
+    main.cpp
+)
+target_link_libraries(
+    bootle17 
+    
+    ff
+    gmpxx
+    # gmp
+    # procps
+    OpenSSL::Crypto
+)
 
-include_directories(/usr/local/include)
-include_directories(../libsnark)
-include_directories(../libsnark/depends/libfqfft/)
-link_directories(/usr/local/lib)
+add_executable(
+    bootle_test
+    
+    test.cpp
+)
+target_link_libraries(
+    bootle_test 
+    
+    ff
+    gmpxx
+)
 
-add_executable(bootle_test test.cpp)
-
-target_link_libraries(bootle17 ff)
-target_link_libraries(bootle17 gmpxx)
-target_link_libraries(bootle17 gmp)
-target_link_libraries(bootle17 procps)
+option(BUILD_TEST "Whether or not to build the tests" ON)
+if (${BUILD_TEST})
+    message(STATUS "Building tests")
+    enable_testing()  # Enable testing only works in root scope
+    add_subdirectory(tests)
+endif ()

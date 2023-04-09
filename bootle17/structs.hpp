@@ -70,7 +70,8 @@ public:
     void set_num_column(const size_t num_column);
     void add_row_vector(const row_vector<FieldT>& row_vec);
 
-    void set_item(const size_t row_num, const size_t col_num, const FieldT& val);
+    // row_idx 和 col_idx 从 0 开始, 可选范围为分别为 [0, row_num-1], [0, col_num-1]
+    void set_item(const size_t row_idx, const size_t col_idx, const FieldT& val);
     
 
     size_t get_row_num() const;
@@ -88,6 +89,13 @@ public:
     // void operator+=(const row_vector_matrix<FieldT> &other);
     bool operator==(const row_vector_matrix<FieldT> &other) const;
     bool operator!=(const row_vector_matrix<FieldT> &other) const;
+
+    /* Consider the matrices A and B, which have mn rows, given respectively by
+    vectors ai,j , bi,j ∈ F^k, with 0 ≤ i ≤ m−1, 1 ≤ j ≤ n. The top-left element of A
+    is a 1. Columns 2 up to k of A are equal to columns 1 up to k − 1 of B. Further,
+    we can obtain the first column of A from the last column of B by deleting the
+    last entry c and appending a 1. In this case, A is said to be the shift of B.*/
+    row_vector_matrix<FieldT> shift() const;
 
     // 随机生成一个 row_vector_matrix
     static row_vector_matrix<FieldT> random(const size_t row_num, const size_t col_num);

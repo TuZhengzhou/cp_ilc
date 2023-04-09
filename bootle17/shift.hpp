@@ -8,7 +8,7 @@ Shift relation:
     Consider the matrices A and B, which have mn rows, given respectively by
     vectors ai,j , bi,j ∈ F^k, with 0 ≤ i ≤ m−1, 1 ≤ j ≤ n. The top-left element of A
     is a 1. Columns 2 up to k of A are equal to columns 1 up to k − 1 of B. Further,
-    we can obtain the first column of A from the first column of B by deleting the
+    we can obtain the first column of A from the last column of B by deleting the
     last entry c and appending a 1. In this case, A is said to be the shift of B.
 
     B                                       A

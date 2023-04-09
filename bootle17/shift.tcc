@@ -403,14 +403,14 @@ void shift_test() {
     col_num = std::pow(2UL, mu) * n;
     row_num = std::pow(2UL, mu) * n;
 
-    row_vector_matrix<FieldT> B = row_vector_matrix<FieldT>::linear_grow(row_num, col_num, FieldT::one(), FieldT::one() * 2);
-    row_vector_matrix<FieldT> D = row_vector_matrix<FieldT>::linear_grow(row_num, col_num, FieldT::one() * row_num * col_num, FieldT::one());
+    row_vector_matrix<FieldT> B = row_vector_matrix<FieldT>::random(row_num, col_num);
+    row_vector_matrix<FieldT> D = row_vector_matrix<FieldT>::random(row_num, col_num);
+    FieldT rand_val = FieldT::random_element();
+    B.set_item(row_num-1, col_num-1, rand_val);
+    D.set_item(row_num-1, col_num-1, rand_val);
 
-    row_vector_matrix<FieldT> A = row_vector_matrix<FieldT>::linear_grow(row_num, col_num, FieldT::one() * (1 - 2), FieldT::one() * 2);
-    A.set_item(0, 0, FieldT::one());
-
-    row_vector_matrix<FieldT> C = row_vector_matrix<FieldT>::linear_grow(row_num, col_num, FieldT::one() * (row_num * col_num - 1), FieldT::one());
-    C.set_item(0, 0, FieldT::one());
+    row_vector_matrix<FieldT> A = B.shift();
+    row_vector_matrix<FieldT> C = D.shift();
 
     pp_shift<FieldT> shift = pp_shift<FieldT>(col_num, mu, n, A, B, C, D);
     shift.is_satisfy();

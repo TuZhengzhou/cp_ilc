@@ -1,14 +1,11 @@
+// #define CURVE_ALT_BN128
 #include <bits/stdc++.h>
-#include "libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp"
-#include "eq.tcc"
 #include "structs.tcc"
+#include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
 
 int main() {
     typedef libff::Fr<libff::mnt6_pp> FieldT;
-    // libff::start_profiling();
     libff::mnt6_pp::init_public_params();
-    eq_test<FieldT>();
-    // printf("Hello");
 
     size_t row, col, start, step;
     row = 3; col = 3; start = 4; step = 1;
@@ -20,5 +17,6 @@ int main() {
         }
         std::cout << std::endl;
     }
-    return 0;
+
+    return 1;
 }

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <libff/common/utils.hpp>
+#include <libff/algebra/fields/fp.hpp>
 
 template<typename FieldT>
 class row_vector_matrix; // 前置声明
@@ -64,6 +65,7 @@ private:
 public:
     row_vector_matrix() {}
     row_vector_matrix(size_t num_column): num_column(num_column) {};
+    row_vector_matrix(const std::vector<FieldT>& vec, const size_t num_row, const size_t num_column);
     row_vector_matrix(std::vector<row_vector<FieldT> >& matrix, size_t num_column);
     row_vector_matrix(const row_vector_matrix& other);
 
@@ -84,8 +86,8 @@ public:
     row_vector_matrix<FieldT> operator+(const row_vector_matrix<FieldT> &other) const;
     // row_vector_matrix<FieldT> operator-(const row_vector_matrix<FieldT> &other) const;
     row_vector_matrix<FieldT> operator*(const row_vector_matrix<FieldT> &other) const;
-    // row_vector_matrix<FieldT> operator*(const row_vector_matrix &field_coeff) const;
-    // row_vector_matrix<FieldT> operator*(const row_vector_matrix integer_coeff) const;
+    row_vector_matrix<FieldT> operator*(const FieldT &field_coeff) const;
+    row_vector_matrix<FieldT> operator*(const integer_coeff_t integer_coeff) const;
     // void operator+=(const row_vector_matrix<FieldT> &other);
     bool operator==(const row_vector_matrix<FieldT> &other) const;
     bool operator!=(const row_vector_matrix<FieldT> &other) const;
@@ -96,6 +98,23 @@ public:
     we can obtain the first column of A from the last column of B by deleting the
     last entry c and appending a 1. In this case, A is said to be the shift of B.*/
     row_vector_matrix<FieldT> shift() const;
+
+    /*
+        返回 row_vector_matrix 的部分积, 可以选择从 1 开始或者从 首行首列元素 a[0][0] 开始
+        choice 为 false 表示从 1 开始
+        choice 为 true 表示从 a[0][0] 开始
+    */
+    row_vector_matrix<FieldT> partial_products(const bool choice) const;
+
+    /*
+        扁平化
+    */
+    std::vector<FieldT> flatten() const;
+
+    /*
+        洗牌
+    */
+    row_vector_matrix<FieldT> shuffle() const;
 
     // 随机生成一个 row_vector_matrix
     static row_vector_matrix<FieldT> random(const size_t row_num, const size_t col_num);
@@ -110,6 +129,8 @@ public:
         ...
     */
     static row_vector_matrix<FieldT> linear_grow(const size_t row_num, const size_t col_num, const FieldT& start, const FieldT& step);
+
+    void print() const;
 };
 
 template<typename FieldT>

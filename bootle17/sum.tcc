@@ -75,7 +75,7 @@ bool pp_sum<FieldT>::is_satisfy() const {
 }
 
 template<typename FieldT>
-bool pp_sum<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> row_vec) const {
+bool pp_sum<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output) const {
     assert(this->num_column > 0);
     assert(this->num_column == this->A.get_column_num() \
             && this->num_column == this->B.get_column_num() \
@@ -103,10 +103,10 @@ bool pp_sum<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> ro
     // std::cout << row_vec.get_all_items() << std::endl;
 
     if (A_open + B_open + C_open != row_vec) {
-        printf("pp_sum<FieldT>::verify() \033[31mfail\033[37m\n\n");
+        if (output) printf("pp_sum<FieldT>::verify() \033[31mfail\033[37m\n\n");
         return false;
     }
-    printf("pp_sum<FieldT>::verify() \033[32mpass\033[37m\n\n");
+    if (output) printf("pp_sum<FieldT>::verify() \033[32mpass\033[37m\n\n");
     return true;
 }
 
@@ -136,7 +136,7 @@ void sum_test() {
     bool satisfy_result = sum.is_satisfy();
     assert(satisfy_result == true);
     
-    bool verify_result = sum.verify(challenage, result);
+    bool verify_result = sum.verify(challenage, result, true);
     assert(verify_result == true);
 
     return;

@@ -4,7 +4,9 @@ add_definitions(-DCURVE=BN128)
 
 include_directories(/usr/local/include)
 include_directories(../libsnark)
+# include_directories(../circuit/)
 include_directories(../libsnark/depends/libfqfft/)
+include_directories(../libsnark/depends/libff/)
 link_directories(/usr/local/lib)
 
 add_executable(merkle main.cpp ../circuit/merklecircuit.h)

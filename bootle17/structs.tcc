@@ -2,7 +2,6 @@
 #define BOOTLE_STRUCTS_TCC
 #include <vector>
 #include <map>
-#include <libff/algebra/fields/fp.hpp>
 #include <openssl/sha.h>
 #include "structs.hpp"
 
@@ -303,6 +302,18 @@ row_vector<FieldT> operator*(const FieldT &field_coeff, const row_vector<FieldT>
 }
 
 template<typename FieldT>
+row_vector_matrix<FieldT>::row_vector_matrix(const std::vector<FieldT>& vec, const size_t num_row, const size_t num_column) {
+    assert(vec.size() == num_row * num_column);
+    this->num_column = num_column;
+    this->matrix.clear();
+
+    for (size_t i = 0; i < num_row; i++) {
+        this->add_row_vector(row_vector<FieldT>(std::vector<FieldT>(vec.begin() + i * num_column, vec.begin() + (i+1) * num_column)));
+    }
+}
+
+
+template<typename FieldT>
 row_vector_matrix<FieldT>::row_vector_matrix(std::vector<row_vector<FieldT> >& matrix, size_t num_column) {
     size_t upper_bound = matrix.size();
     for (size_t i = 0; i < upper_bound; i++) {
@@ -402,6 +413,22 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator*(const row_vector_
 }
 
 template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator*(const FieldT &field_coeff) const {
+
+    row_vector_matrix<FieldT> result(this->num_column);
+    size_t upper_bound = this->get_row_num();
+    for (size_t i = 0; i < upper_bound; i++) {
+        result.add_row_vector(this->get_row(i) * field_coeff);
+    }
+    return result;
+}
+
+template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator*(const integer_coeff_t integer_coeff) const {
+    return (*this) * (FieldT::one() * integer_coeff);
+}
+
+template<typename FieldT>
 bool row_vector_matrix<FieldT>::operator==(const row_vector_matrix<FieldT> &other) const {
     assert(this->num_column == other.get_column_num());
     assert(this->get_row_num() == other.get_row_num());
@@ -449,6 +476,54 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::shift() const {
 }
 
 template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::partial_products(const bool choice) const {
+    size_t row_num = this->get_row_num();
+    size_t col_num = this->get_column_num();
+    row_vector_matrix<FieldT> result = row_vector_matrix<FieldT>::all_one(row_num, col_num);
+
+    if (choice == false) {
+        for (size_t row = 0; row < row_num; row++) {
+            for (size_t col = 0; col < col_num - 1; col++) {
+                result.set_item(row, col+1, result.get_item(row, col) * this->get_item(row, col));
+            }
+            if (row + 1 < row_num) {
+                result.set_item(row+1, 0, result.get_item(row, col_num-1)* this->get_item(row, col_num-1));
+            }
+        }
+    } else {
+        FieldT pre_partial_sum = FieldT::one();
+        for (size_t row = 0; row < row_num; row++) {
+            for (size_t col = 0; col < col_num; col++) {
+                result.set_item(row, col, pre_partial_sum * this->get_item(row, col));
+                pre_partial_sum = result.get_item(row, col);
+            }
+        }
+    }
+
+    return result;
+}
+
+template<typename FieldT>
+std::vector<FieldT> row_vector_matrix<FieldT>::flatten() const {
+    std::vector<FieldT> result;
+    size_t row_num = this->get_row_num();
+    for (size_t i = 0; i < row_num; i++) {
+        result.insert(result.end(), this->get_row(i).get_all_items().begin(), this->get_row(i).get_all_items().end());
+    }
+    return result;
+}
+
+template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::shuffle() const {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::vector<FieldT> flattened = this->flatten();
+    std::shuffle(flattened.begin(), flattened.end(), gen);
+
+    return row_vector_matrix<FieldT>(flattened, this->get_row_num(), this->get_column_num());
+}
+
+template<typename FieldT>
 row_vector_matrix<FieldT> row_vector_matrix<FieldT>::all_one(const size_t row_num, const size_t col_num) {
     row_vector_matrix<FieldT> result(col_num);
     for (size_t i = 0; i < row_num; i++) {
@@ -473,6 +548,18 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::linear_grow(const size_t ro
         result.add_row_vector(row_vector<FieldT>::linear_grow(col_num, start + step * col_num * i, step));
     }
     return result;
+}
+
+template<typename FieldT>
+void row_vector_matrix<FieldT>::print() const {
+    size_t row_num = this->get_row_num();
+    size_t col_num = this->get_column_num();
+    for (size_t i = 0; i < row_num; i++) {
+        for(size_t j = 0; j < col_num; j++) {
+            std::cout << this->get_row(i).get_item(j) << " ";
+        }
+        std::cout << std::endl;
+    }
 }
 
 template<typename FieldT>

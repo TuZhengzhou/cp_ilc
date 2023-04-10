@@ -285,7 +285,7 @@ bool pp_prod<FieldT>::prove(const FieldT& y, const FieldT& x0) {
 }
 
 template<typename FieldT>
-bool pp_prod<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x) const {
+bool pp_prod<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output) const {
     
     std::vector<FieldT> y_related           = this->get_y_related(y);
     std::vector<FieldT> compress_xs         = fake_xs(x0, this->mu_);
@@ -297,10 +297,10 @@ bool pp_prod<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x)
     row_vector<FieldT> c_dot = this->open_C(y_related, compress_xs, x_related);
 
     if (a_dot * b_dot != c_dot) {
-        printf("pp_prod<FieldT>::verify \033[31mfail\033[37m\n\n");
+        if (output) printf("pp_prod<FieldT>::verify \033[31mfail\033[37m\n\n");
         return false;
     }
-    printf("pp_prod<FieldT>::verify \033[32mpass\033[37m\n\n");
+    if (output) printf("pp_prod<FieldT>::verify \033[32mpass\033[37m\n\n");
     return true;
 }
 
@@ -329,7 +329,7 @@ void prod_test() {
     prod.prove(y, x0);
 
     FieldT x = FieldT::random_element();   
-    prod.verify(y, x0, x);
+    prod.verify(y, x0, x, true);
 }
 
 #endif

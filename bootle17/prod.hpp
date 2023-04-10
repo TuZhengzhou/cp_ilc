@@ -4,6 +4,17 @@
 #include "structs.hpp"
 #include "structs.tcc"
 
+/*
+    prove hadmard product relation
+
+    初始化: 
+    pp_prod(const size_t mu, const size_t n, const size_t col_num, \
+        const row_vector_matrix<FieldT>& A,  const row_vector_matrix<FieldT>& B, \
+        const row_vector_matrix<FieldT>& C);
+
+    for matrix A, B, C, which's row is 2^mu * n, column is col_num
+    prove A * B = C, where * means hadmard product
+*/
 template<typename FieldT>
 class pp_prod {
 private:
@@ -51,7 +62,7 @@ public:
     // 证明, 赋值 a0, b0, c0, d_plus_s, d_sub_s, error_s
     bool prove(const FieldT& y, const FieldT& x0);
     // 验证
-    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x) const;
+    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output = false) const;
 };
 
 template<typename FieldT>

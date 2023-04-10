@@ -21,7 +21,7 @@ public:
     void submit(const row_vector_matrix<FieldT>& matrix);
     bool is_satisfy(row_vector_matrix<FieldT>& other) const;
 
-    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec) const;
+    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output = false) const;
 };
 
 template<typename FieldT>

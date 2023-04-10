@@ -4,6 +4,13 @@
 
 
 /*
+prove of Double Shift condition
+
+initialize:
+    pp_shift(size_t k, size_t mu, size_t n, const row_vector_matrix<FieldT>& A, \
+            const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C, \
+            const row_vector_matrix<FieldT>& D);
+
 Shift relation:
     Consider the matrices A and B, which have mn rows, given respectively by
     vectors ai,j , bi,j ∈ F^k, with 0 ≤ i ≤ m−1, 1 ≤ j ≤ n. The top-left element of A
@@ -23,7 +30,6 @@ Double Shift condition:
     of B, C the shift of D, and B and D have the same bottom-right-most entry
     bmn,k = dmn,k. This is referred to as the double-shift condition.
 */
-// prove of Double Shift condition
 template<typename FieldT>
 class pp_shift {
     typedef std::vector<std::vector<std::vector<row_vector<FieldT> > > > relate_t;
@@ -38,7 +44,7 @@ public:
 
     bool prove(const FieldT& y, const FieldT& x0);
 
-    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x) const;
+    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output = false) const;
 
 private:
     // 矩阵尺寸参数: (m_ * n_) * k_ = (2^mu_ * n_) * k_. k_ 列数, (m_ * n_) 行数

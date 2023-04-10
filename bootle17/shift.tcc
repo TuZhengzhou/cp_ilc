@@ -368,7 +368,7 @@ row_vector<FieldT>& d_hat, FieldT& e_hat, const FieldT& x) const {
 }
 
 template<typename FieldT>
-bool pp_shift<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x) const {
+bool pp_shift<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output) const {
     row_vector<FieldT> a_hat(this->k_, FieldT::zero());
     row_vector<FieldT> b_hat(this->k_, FieldT::zero());
     row_vector<FieldT> c_hat(this->k_, FieldT::zero());
@@ -388,10 +388,10 @@ bool pp_shift<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x
     FieldT right = FieldT::one() - y_exp_2N + e_hat;
 
     if (left != right) {
-        printf("pp_shift<FieldT>::verify \033[31mfail\033[37m\n\n");
+        if (output) printf("pp_shift<FieldT>::verify \033[31mfail\033[37m\n\n");
         return false;
     }
-    printf("pp_shift<FieldT>::verify \033[32mpass\033[37m\n\n");
+    if (output) printf("pp_shift<FieldT>::verify \033[32mpass\033[37m\n\n");
     return true;
 }
 
@@ -420,7 +420,7 @@ void shift_test() {
     FieldT x  = FieldT::random_element();
 
     shift.prove(y, x0);
-    shift.verify(y, x0, x);
+    shift.verify(y, x0, x, true);
 }
 
 #endif

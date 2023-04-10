@@ -1,0 +1,7 @@
+scipt:
+  cd ./build/bootle17
+  make bootle_check
+
+  or
+  cd ./build/bootle17/tests
+  ctest

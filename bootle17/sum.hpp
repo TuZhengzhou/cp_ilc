@@ -24,7 +24,7 @@ public:
     void submit_all(const row_vector_matrix<FieldT>& A, const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
     bool is_satisfy() const;
 
-    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec) const;
+    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output = false) const;
 };
 
 template<typename FieldT>

@@ -41,7 +41,7 @@ bool pp_eq<FieldT>::is_satisfy(row_vector_matrix<FieldT>& other) const {
 }
 
 template<typename FieldT>
-bool pp_eq<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> row_vec) const {
+bool pp_eq<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output) const {
     assert(this->num_column > 0UL);
     assert(this->num_column == this->A.get_column_num() && this->num_column == row_vec.size());
     std::vector<FieldT> linear_combination = {challenge};
@@ -52,10 +52,10 @@ bool pp_eq<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT> row
     row_vector<FieldT> A_open = this->A.open(linear_combination);
 
     if (A_open != row_vec) {
-        printf("pp_eq<FieldT>::verify() \033[31mfail\033[37m\n\n");
+        if (output) printf("pp_eq<FieldT>::verify() \033[31mfail\033[37m\n\n");
         return false;
     }
-    printf("pp_eq<FieldT>::verify() \033[32mpass\033[37m\n\n");
+    if (output) printf("pp_eq<FieldT>::verify() \033[32mpass\033[37m\n\n");
     return true;
 }
 
@@ -79,7 +79,7 @@ void eq_test() {
         result += A.get_row(i) * coeff;
         coeff *= challenage;
     }
-    bool verify_result = eq.verify(challenage, result);
+    bool verify_result = eq.verify(challenage, result, true);
     assert(verify_result == true);
 }
 #endif

@@ -122,6 +122,7 @@ std::string hexToChar(const char c) {
         case 'e': return "1110";
         case 'f': return "1111";
     }
+    return "";
 }
 
 libff::bit_vector hexToBin(std::string& str) {
@@ -163,7 +164,7 @@ libff::bit_vector hash256(std::string str) {
     //padding input
     size_t size = operand.size();
     char tmpc[20];
-    sprintf(tmpc, "%x", size);
+    sprintf(tmpc, "%lx", size);
     std::string tmps(tmpc);
     libff::bit_vector s = hexToBin(tmps);
     operand.push_back(1);

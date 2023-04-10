@@ -7,6 +7,7 @@ find_package(OpenSSL REQUIRED)
 # include_directories(../libsnark)
 # include_directories(../libsnark/depends/libfqfft/)
 include_directories(../libsnark/depends/libff/)
+include_directories(./)
 
 link_directories(/usr/local/lib)
 
@@ -25,17 +26,19 @@ target_link_libraries(
     OpenSSL::Crypto
 )
 
-add_executable(
-    bootle_test
+# add_executable(
+#     bootle_test
     
-    test.cpp
-)
-target_link_libraries(
-    bootle_test 
+#     test.cpp
+# )
+# target_link_libraries(
+#     bootle_test 
     
-    ff
-    gmpxx
-)
+#     ff
+#     gmpxx
+# )
+
+add_custom_target(bootle_check COMMAND ${CMAKE_CTEST_COMMAND})
 
 option(BUILD_TEST "Whether or not to build the tests" ON)
 if (${BUILD_TEST})

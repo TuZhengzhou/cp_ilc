@@ -32,7 +32,9 @@ Double Shift condition:
 */
 template<typename FieldT>
 class pp_shift {
-    typedef std::vector<std::vector<std::vector<row_vector<FieldT> > > > relate_t;
+
+typedef std::vector<std::vector<std::vector<row_vector<FieldT> > > > relate_t;
+
 public:
     
     pp_shift() {};

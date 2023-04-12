@@ -15,13 +15,16 @@ private:
 public:
     pp_eq() {};
     pp_eq(const size_t num_column): num_column(num_column) {};
+
+    /* pp_eq(const size_t num_column, const row_vector_matrix<FieldT>& A); */
     pp_eq(const size_t num_column, const row_vector_matrix<FieldT>& A);
 
     void set_num_column(const size_t num_column);
     void submit(const row_vector_matrix<FieldT>& matrix);
     bool is_satisfy(row_vector_matrix<FieldT>& other) const;
 
-    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output = false) const;
+    // bool verify(const FieldT& challenge, const row_vector<FieldT>& row_vec, const bool output = false) const;
+    bool verify(const FieldT& challenge, const row_vector_matrix<FieldT>& pub_matrix, const bool output = false) const;
 };
 
 template<typename FieldT>

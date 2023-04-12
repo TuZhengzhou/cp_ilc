@@ -2,14 +2,23 @@
 #define BOOTLE_STRUCTS_HPP
 #include <iostream>
 #include <vector>
-#include <libff/common/utils.hpp>
+// #include <libff/common/utils.hpp>
+#include "../libsnark/depends/libff/libff/common/utils.hpp"
 #include <libff/algebra/fields/fp.hpp>
+// #include "permutation.hpp"
 
 template<typename FieldT>
 class row_vector_matrix; // 前置声明
 
+template <typename T, size_t N>
+class permutation;       // 前置声明
+
 typedef long integer_coeff_t;
 
+
+/*
+    row_vector
+*/
 template<typename FieldT>
 class row_vector {
 private:
@@ -51,12 +60,19 @@ public:
     void set_zero();    // 将向量设置为全 0
     FieldT open(const std::vector<FieldT>& linear_combination) const;
 
+    /* 通过设置 friend 关键字, 让 row_vector_matrix 类的 set_item 函数可以直接访问 row_vector 的私有内容, 而完成 item 的设置 */
     friend void row_vector_matrix<FieldT>::set_item(const size_t row_num, const size_t col_num, const FieldT& val);
 };
 
 template<typename FieldT>
 row_vector<FieldT> operator*(const FieldT &field_coeff, const row_vector<FieldT> &row_vec);
 
+
+
+
+/*
+    row_vector_matrix
+*/
 template<typename FieldT>
 class row_vector_matrix {
 private:
@@ -84,7 +100,7 @@ public:
     row_vector<FieldT> open(const std::vector<FieldT>& linear_combination) const;
 
     row_vector_matrix<FieldT> operator+(const row_vector_matrix<FieldT> &other) const;
-    // row_vector_matrix<FieldT> operator-(const row_vector_matrix<FieldT> &other) const;
+    row_vector_matrix<FieldT> operator-(const row_vector_matrix<FieldT> &other) const;
     row_vector_matrix<FieldT> operator*(const row_vector_matrix<FieldT> &other) const;
     row_vector_matrix<FieldT> operator*(const FieldT &field_coeff) const;
     row_vector_matrix<FieldT> operator*(const integer_coeff_t integer_coeff) const;
@@ -133,6 +149,12 @@ public:
     void print() const;
 };
 
+/*
+    排列, 返回排列后的结果, 不会对原内容造成修改
+*/
+template <typename FieldT, size_t N>
+row_vector_matrix<FieldT> apply_permutation(const row_vector_matrix<FieldT>& matrix, const permutation<std::tuple<size_t, size_t>, N>& perm);
+
 template<typename FieldT>
 FieldT next_challenge(FieldT &challenge) {
     return challenge * 17 - FieldT::one() * 16;
@@ -176,4 +198,73 @@ void field_test();
 
 template <typename FieldT>
 void matrix_test();
+
+
+/*
+    cycle
+*/
+template <typename T, size_t N>
+class cycle {
+public:
+    cycle() {};
+    /* cycle(const std::vector<T>& contents); */
+    cycle(const std::vector<T>& contents);
+    /* cycle(const cycle& other); */
+    cycle(const cycle& other);
+
+    const std::vector<T>& get_content_vector() const;
+
+    /* 
+        cycle 的长度为 cycle_len
+        dim 表示排列的形式, 可以是向量的排列, 也可以是矩阵的排列
+        dim_limits 表示各个维度的取值上限, 例如 [3,4,5] 表示 1,2,3 维取值范围分别为 [0,3-1], [0,4-1], [0,5-1]
+    */
+    static cycle<T, N> random_cycle(const size_t cycle_len, const size_t dim, const std::vector<size_t>& dim_limits);
+
+    friend std::ostream& operator<<(std::ostream& os, const cycle<T, N>& c) {
+        os << "[";
+        const std::vector<T>& cycle_vec = c.get_content_vector();
+        for (size_t i = 0; i < cycle_vec.size(); i++) {
+            os << "(";
+            // for (size_t j = 0; j < cycle_vec[i].size(); j++) {
+            //     const size_t idx = j;
+            //     os << std::get<idx>(cycle_vec[i]) << " ";
+            // }
+            os << std::get<0>(cycle_vec[i]) << " ...";
+            os << ")";
+        }
+        os << "]";
+        return os;
+    }
+private:
+    std::vector<T> cycle_;
+};
+
+/*
+    permutation
+*/
+template <typename T, size_t N>
+class permutation {
+public:
+    /* 默认构造函数, 会将 cycle_ 设置为空的 vector */
+    permutation() {};
+    
+    /* permutation(const std::vector<std::vector<T>>) */
+    permutation(const std::vector<std::vector<T>>);
+    /* permutation(const permutation<T>& other); */
+    permutation(const permutation<T, N>& other);
+
+    const size_t num_cycles() const;
+    const cycle<T, N>& get_cycle(const size_t idx) const;
+
+    /* 
+        生成 cycle_num 个 cycle
+        每个 cycle 的长度为 cycle_len
+        dim 表示排列的形式, 可以是向量的排列, 也可以是矩阵的排列
+        dim_limits 表示各个维度的取值上限, 例如 [3,4,5] 表示 1,2,3 维取值范围分别为 [0,3-1], [0,4-1], [0,5-1]
+    */
+    static permutation<T, N> random_permutation(const size_t cycle_len, const size_t cycle_num, const size_t dim, const std::vector<size_t>& dim_limits);
+private:
+    std::vector<cycle<T, N> > permutation_;
+};
 #endif

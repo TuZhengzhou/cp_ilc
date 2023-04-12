@@ -2,6 +2,7 @@
 #define BOOTLE_STRUCTS_TCC
 #include <vector>
 #include <map>
+#include <algorithm>
 #include <openssl/sha.h>
 #include "structs.hpp"
 
@@ -400,6 +401,19 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator+(const row_vector_
 }
 
 template<typename FieldT>
+row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator-(const row_vector_matrix<FieldT> &other) const {
+    assert(this->num_column == other.get_column_num());
+    assert(this->get_row_num() == other.get_row_num());
+
+    row_vector_matrix<FieldT> result(this->num_column);
+    size_t upper_bound = this->get_row_num();
+    for (size_t i = 0; i < upper_bound; i++) {
+        result.add_row_vector(this->get_row(i) - other.get_row(i));
+    }
+    return result;
+}
+
+template<typename FieldT>
 row_vector_matrix<FieldT> row_vector_matrix<FieldT>::operator*(const row_vector_matrix<FieldT> &other) const {
     assert(this->num_column == other.get_column_num());
     assert(this->get_row_num() == other.get_row_num());
@@ -521,6 +535,31 @@ row_vector_matrix<FieldT> row_vector_matrix<FieldT>::shuffle() const {
     std::shuffle(flattened.begin(), flattened.end(), gen);
 
     return row_vector_matrix<FieldT>(flattened, this->get_row_num(), this->get_column_num());
+}
+
+template <typename FieldT, size_t N>
+row_vector_matrix<FieldT> apply_permutation(const row_vector_matrix<FieldT>& matrix, const permutation<std::tuple<size_t, size_t>, N>& perm) {
+    
+    row_vector_matrix<FieldT> result = row_vector_matrix<FieldT>(matrix);
+    
+    size_t cycle_num = perm.num_cycles();
+    for (size_t i = 0; i < cycle_num; i++) {
+        const std::vector<std::tuple<size_t, size_t>>& cycle_tmp = perm.get_cycle(i).get_content_vector();
+        size_t cycle_len = cycle_tmp.size();
+
+        size_t row_1, col_1, row_2, col_2;
+        std::tie(row_1, col_1) = cycle_tmp[0];
+        FieldT head_val = result.get_item(row_1, col_1);
+
+        for (size_t j = 1; j < cycle_len; j++) {
+            std::tie(row_2, col_2) = cycle_tmp[j];
+            result.set_item(row_1, col_1, result.get_item(row_2, col_2));
+            row_1 = row_2;
+            col_1 = col_2;
+        }
+        result.set_item(row_1, col_1, head_val);
+    }
+    return result;
 }
 
 template<typename FieldT>
@@ -787,6 +826,128 @@ void matrix_test() {
     size_t coeff = std::rand();
     assert(result == example.open(linear_combination));
     std::cout << "matrix_test \033[32mpass\033[37m" << std::endl;
+}
+
+template <typename T, size_t N>
+cycle<T, N>::cycle(const std::vector<T>& contents) {
+    this->cycle_ = std::vector<T>(contents.begin(), contents.end());
+}
+
+template <typename T, size_t N>
+cycle<T, N>::cycle(const cycle& other) {
+    const std::vector<T>& other_contents = other.get_content_vector();
+    this->cycle_ = std::vector<T>(other_contents.begin(), other_contents.end());
+}
+
+template <typename T, size_t N>
+const std::vector<T>& cycle<T, N>::get_content_vector() const {
+    return this->cycle_;
+}
+
+template <typename T, size_t N>
+cycle<T, N> cycle<T, N>::random_cycle(const size_t cycle_len, const size_t dim, const std::vector<size_t>& dim_limits) {
+
+}
+
+template <typename T, size_t N>
+permutation<T, N>::permutation(const std::vector<std::vector<T>> content) {
+    size_t cycle_num = content.size();
+    for (size_t i = 0; i < cycle_num; i++) {
+        this->permutation_.push_back(cycle<T, N>(content[i]));
+    }
+}
+
+template <typename T, size_t N>
+permutation<T, N>::permutation(const permutation<T, N>& other) {
+    size_t cycle_num = other.num_cycles();
+    for (size_t i = 0; i < cycle_num; i++) {
+        this->permutation_.push_back(cycle<T, N>(other.get_cycle(i)));
+    }
+}
+
+template <typename T, size_t N>
+const size_t permutation<T, N>::num_cycles() const {
+    return this->permutation_.size();
+}
+
+template <typename T, size_t N>
+const cycle<T, N>& permutation<T, N>::get_cycle(const size_t idx) const {
+    assert(idx < this->num_cycles());
+    return this->permutation_.at(idx);
+}
+
+template<typename T, size_t... Is>
+auto vector_to_tuple_helper(const std::vector<T>& v, std::index_sequence<Is...>) {
+    return std::make_tuple(v[Is]...);
+}
+
+template<typename T, size_t N>
+auto vector_to_tuple(const std::vector<T>& v) {
+    return vector_to_tuple_helper(v, std::make_index_sequence<N>{});
+}
+
+template <typename T, std::size_t N>
+permutation<T, N> permutation<T, N>::random_permutation(const size_t cycle_len, const size_t cycle_num, \
+                                                    const size_t dim_num, const std::vector<size_t>& dim_limits) {
+    assert(dim_num >= 1);
+    assert(dim_num == dim_limits.size());
+
+    size_t limit_max = 0;
+    size_t total_item_num = 1ul;
+    for (size_t limit: dim_limits) { 
+        total_item_num *= limit; 
+        limit_max = limit > limit_max ? limit : limit_max;
+    };
+    assert(cycle_len * cycle_num <= total_item_num);
+    assert(total_item_num < SIZE_MAX);
+
+    permutation<T, N> result;
+
+    size_t i, j, k;
+
+    /*
+        部分乘积, 表示每一维度对应元素数目
+    */
+    std::vector<size_t> part_prod_inv;
+    for (i = 0; i < dim_num; i++) {
+        if (i == 0) {
+            part_prod_inv.emplace_back(total_item_num / dim_limits[0]);
+        } else {
+            part_prod_inv.emplace_back(part_prod_inv[i-1] / dim_limits[i]);
+        }
+    }
+    std::cout << "part_prod_inv: \n" << part_prod_inv << std::endl;
+
+    /* 设置随机数生成器 */
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, limit_max);
+
+    size_t mark_idx;
+    std::vector<bool> mark_board = std::vector<bool>(total_item_num, false);
+    for ( i = 0; i < cycle_num; i++) {
+
+        std::vector<T> cycle_vector;
+        for ( j = 0; j < cycle_len; j++) {
+
+            mark_idx = 0;
+            std::vector<size_t> dim_idxs(dim_num);
+            for ( k = 0; k < dim_num; k++) {
+                dim_idxs[k] = dis(gen) % dim_limits[k];
+                mark_idx += dim_idxs[k] * part_prod_inv[k];
+            }
+
+            if (mark_board[mark_idx] == false) {
+                mark_board[mark_idx] = true;
+                cycle_vector.push_back(vector_to_tuple<size_t, N>(dim_idxs));
+            } else {
+                j -= 1;
+            }
+        }
+
+        result.permutation_.emplace_back(cycle<T, N>(cycle_vector));
+    }
+    return result;
 }
 
 #endif

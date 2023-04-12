@@ -26,17 +26,18 @@ target_link_libraries(
     OpenSSL::Crypto
 )
 
-# add_executable(
-#     bootle_test
+add_executable(
+    toy_test
     
-#     test.cpp
-# )
-# target_link_libraries(
-#     bootle_test 
+    toy_test.cpp
+)
+target_link_libraries(
+    toy_test 
     
-#     ff
-#     gmpxx
-# )
+    ff
+    gmpxx
+    OpenSSL::Crypto
+)
 
 add_custom_target(bootle_check COMMAND ${CMAKE_CTEST_COMMAND})
 

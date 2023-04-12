@@ -17,6 +17,18 @@
 */
 template<typename FieldT>
 class pp_prod {
+public:
+    pp_prod() {}
+    pp_prod(const size_t mu, const size_t n, const size_t col_num, const row_vector_matrix<FieldT>& A,  const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
+
+
+    // 检查明文是否符合
+    bool is_satisfy() const;
+    // 证明, 赋值 a0, b0, c0, d_plus_s, d_sub_s, error_s
+    bool prove(const FieldT& y, const FieldT& x0);
+    // 验证
+    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output = false) const;
+
 private:
     size_t mu_, m_, n_, col_num_;
     row_vector_matrix<FieldT> A, B, C;
@@ -51,18 +63,6 @@ private:
     row_vector<FieldT> open_d_plus_s(const std::vector<FieldT>& compress_xs) const ;
     row_vector<FieldT> open_d_sub_s(const std::vector<FieldT>& compress_xs) const ;
     row_vector<FieldT> open_error_s(const std::vector<FieldT>& x_related) const ;
-
-public:
-    pp_prod() {}
-    pp_prod(const size_t mu, const size_t n, const size_t col_num, const row_vector_matrix<FieldT>& A,  const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
-
-
-    // 检查明文是否符合
-    bool is_satisfy() const;
-    // 证明, 赋值 a0, b0, c0, d_plus_s, d_sub_s, error_s
-    bool prove(const FieldT& y, const FieldT& x0);
-    // 验证
-    bool verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output = false) const;
 };
 
 template<typename FieldT>

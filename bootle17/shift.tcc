@@ -3,38 +3,47 @@
 #include "shift.hpp"
 
 template<typename FieldT>
-pp_shift<FieldT>::pp_shift(size_t k, size_t mu, size_t n, const row_vector_matrix<FieldT>& A, \
+pp_shift<FieldT>::pp_shift(const size_t mu, const size_t n, const size_t col_num, const row_vector_matrix<FieldT>& A, \
     const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C, const row_vector_matrix<FieldT>& D) {
-    this->k_ = k;
+
     this->mu_ = mu;
     this->m_ = std::pow(2ul, this->mu_);
     this->n_ = n;
-    this->N_ = this->k_ * this->m_ * this->n_;
-    printf("k = \033[32m%ld\033[37m, mu = \033[32m%ld\033[37m, m = \033[32m%ld\033[37m, n = \033[32m%ld\033[37m, N = \033[32m%ld\033[37m\n", this->k_, this->mu_, this->m_, this->n_, this->N_);
+    this->row_num_ = this->m_ * this->n_;
+    this->col_num_ = col_num;
+    this->N_ = this->row_num_ * this->col_num_;
+    printf("mu = \033[32m%ld\033[37m, m = \033[32m%ld\033[37m, n = \033[32m%ld\033[37m, col_num = \033[32m%ld\033[37m, N = \033[32m%ld\033[37m\n", this->mu_, this->m_, this->n_, this->col_num_, this->N_);
     this->A_ = row_vector_matrix<FieldT>(A);
     this->B_ = row_vector_matrix<FieldT>(B);
     this->C_ = row_vector_matrix<FieldT>(C);
     this->D_ = row_vector_matrix<FieldT>(D);
+
+    this->y_  = FieldT::random_element();
+    this->y_exps_ = get_exps(this->y_, this->N_);
+    this->y_exps_inv_ = get_exps(this->y_.inverse(), this->N_);
+
+    this->compress_xs_ = row_vector<FieldT>::random(this->mu_).get_all_items();
+    this->xs_exps_ = get_compress_xs_related(this->compress_xs_);
 }
 
 template<typename FieldT>
 bool pp_shift<FieldT>::is_satisfy() {
     if (
     this->A_.get_row(0).get_item(0) != FieldT::one() || this->A_.get_row(0).get_item(0) != FieldT::one()\
-    || this->B_.get_row(this->m_ * this->n_ - 1).get_item(this->k_ - 1) 
-        != this->D_.get_row(this->m_ * this->n_ - 1).get_item(this->k_ - 1) ) {
+    || this->B_.get_row(this->row_num_ - 1).get_item(this->col_num_ - 1) 
+        != this->D_.get_row(this->row_num_ - 1).get_item(this->col_num_ - 1) ) {
         goto is_satisfy_fail;
     }
-    for (size_t row = 0; row < this->m_ * this->n_; row++) {
-        for (size_t col = 0; col < this->k_ - 1; col++) {
+    for (size_t row = 0; row < this->row_num_; row++) {
+        for (size_t col = 0; col < this->col_num_ - 1; col++) {
             if (this->A_.get_item(row, col+1) != this->B_.get_item(row, col) \
                 || this->C_.get_item(row, col+1) != this->D_.get_item(row, col)) {
                 goto is_satisfy_fail;
             }
         }
-        if (row + 1 < this->m_ * this->n_
-            && (this->A_.get_item(row+1, 0) != this->B_.get_item(row, this->k_-1) \
-                || this->C_.get_item(row+1, 0) != this->D_.get_item(row, this->k_-1))) 
+        if (row + 1 < this->row_num_
+            && (this->A_.get_item(row+1, 0) != this->B_.get_item(row, this->col_num_-1) \
+                || this->C_.get_item(row+1, 0) != this->D_.get_item(row, this->col_num_-1))) 
         {
             goto is_satisfy_fail;
         }
@@ -61,49 +70,49 @@ void pp_shift<FieldT>::get_part_sum(const char choice, std::vector<std::vector<s
     switch ( choice ) {
         case 'A': 
             w_hat_prefix = FieldT::one();
-            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_.begin(), this->y_exps_.begin()+this->k_));
+            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_.begin(), this->y_exps_.begin()+this->col_num_));
             for (size_t idx_n = 0; idx_n < dim1; idx_n++) {
                 hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3);
                 w_hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3); 
                 for (size_t idx_m = 0; idx_m < dim3; idx_m += 1) {
                     hat_r[idx_n][0][idx_m] = this->A_.get_row(idx_n * this->m_ + idx_m);
-                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_[(idx_n * this->m_ + idx_m) * this->k_];
+                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_[(idx_n * this->m_ + idx_m) * this->col_num_];
                 }
             }
             break;
         case 'B': 
             w_hat_prefix = - this->y_exps_[1];
-            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_.begin(), this->y_exps_.begin()+this->k_));
+            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_.begin(), this->y_exps_.begin()+this->col_num_));
             for (size_t idx_n = 0; idx_n < dim1; idx_n++) {
                 hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3);
                 w_hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3); 
                 for (size_t idx_m = 0; idx_m < dim3; idx_m += 1) {
                     hat_r[idx_n][0][idx_m] = this->B_.get_row(idx_n * this->m_ + idx_m);
-                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_[(idx_n * this->m_ + idx_m) * this->k_];
+                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_[(idx_n * this->m_ + idx_m) * this->col_num_];
                 }
             }
             break;
         case 'C': 
             w_hat_prefix = - (this->y_exps_[this->N_] * this->y_exps_[this->N_]);
-            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_inv_.begin(), this->y_exps_inv_.begin()+this->k_));
+            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_inv_.begin(), this->y_exps_inv_.begin()+this->col_num_));
             for (size_t idx_n = 0; idx_n < dim1; idx_n++) {
                 hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3);
                 w_hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3); 
                 for (size_t idx_m = 0; idx_m < dim3; idx_m += 1) {
                     hat_r[idx_n][0][idx_m] = this->C_.get_row(idx_n * this->m_ + idx_m);
-                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_inv_[(idx_n * this->m_ + idx_m) * this->k_];
+                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_inv_[(idx_n * this->m_ + idx_m) * this->col_num_];
                 }
             }
             break;
         case 'D': 
             w_hat_prefix = (this->y_exps_[this->N_] * this->y_exps_[this->N_] * this->y_exps_inv_[1]);
-            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_inv_.begin(), this->y_exps_inv_.begin()+this->k_));
+            y_bold = row_vector<FieldT>(std::vector<FieldT>(this->y_exps_inv_.begin(), this->y_exps_inv_.begin()+this->col_num_));
             for (size_t idx_n = 0; idx_n < dim1; idx_n++) {
                 hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3);
                 w_hat_r[idx_n][0] = std::vector<row_vector<FieldT> >(dim3); 
                 for (size_t idx_m = 0; idx_m < dim3; idx_m += 1) {
                     hat_r[idx_n][0][idx_m] = this->D_.get_row(idx_n * this->m_ + idx_m);
-                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_inv_[(idx_n * this->m_ + idx_m) * this->k_];
+                    w_hat_r[idx_n][0][idx_m] = w_hat_prefix * y_bold * this->y_exps_inv_[(idx_n * this->m_ + idx_m) * this->col_num_];
                 }
             }
             break;
@@ -121,7 +130,7 @@ void pp_shift<FieldT>::get_part_sum(const char choice, std::vector<std::vector<s
             hat_r[idx_n][idx_mu] = std::vector<row_vector<FieldT> >(i_upper_bound);
             w_hat_r[idx_n][idx_mu] = std::vector<row_vector<FieldT> >(i_upper_bound);
 
-            pre_challenge = this->xs_[idx_mu - 1];
+            pre_challenge = this->compress_xs_[idx_mu - 1];
             pre_challenge_inverse = pre_challenge.inverse();
             // std::cout << "pre_challenge " << pre_challenge << ", pre_challenge_inverse = " << pre_challenge_inverse << std::endl;
             for (size_t idx_m = 0; idx_m < i_upper_bound; idx_m += 1) {
@@ -172,10 +181,10 @@ bool pp_shift<FieldT>::check_related(const relate_t& a_rel,  const relate_t& b_r
     row_vector<FieldT> b_hat_1 = this->b0_;
     row_vector<FieldT> c_hat_1 = this->c0_;
     row_vector<FieldT> d_hat_1 = this->d0_;
-    row_vector<FieldT> w_hat_a_1 = row_vector<FieldT>::all_zero(this->k_);
-    row_vector<FieldT> w_hat_b_1 = row_vector<FieldT>::all_zero(this->k_);
-    row_vector<FieldT> w_hat_c_1 = row_vector<FieldT>::all_zero(this->k_);
-    row_vector<FieldT> w_hat_d_1 = row_vector<FieldT>::all_zero(this->k_);
+    row_vector<FieldT> w_hat_a_1 = row_vector<FieldT>::all_zero(this->col_num_);
+    row_vector<FieldT> w_hat_b_1 = row_vector<FieldT>::all_zero(this->col_num_);
+    row_vector<FieldT> w_hat_c_1 = row_vector<FieldT>::all_zero(this->col_num_);
+    row_vector<FieldT> w_hat_d_1 = row_vector<FieldT>::all_zero(this->col_num_);
     for (size_t j = 0; j < this->n_; j++) {
         a_hat_1   += a_rel[j][this->mu_][0]   * x_exps[j+1];
         b_hat_1   += b_rel[j][this->mu_][0]   * x_exps[j+1];
@@ -187,10 +196,10 @@ bool pp_shift<FieldT>::check_related(const relate_t& a_rel,  const relate_t& b_r
         w_hat_d_1 += w_d_rel[j][this->mu_][0] * x_exps_inv[j+1];
     }
 
-    row_vector<FieldT> a_hat_2(this->k_, FieldT::zero());
-    row_vector<FieldT> b_hat_2(this->k_, FieldT::zero());
-    row_vector<FieldT> c_hat_2(this->k_, FieldT::zero());
-    row_vector<FieldT> d_hat_2(this->k_, FieldT::zero());
+    row_vector<FieldT> a_hat_2(this->col_num_, FieldT::zero());
+    row_vector<FieldT> b_hat_2(this->col_num_, FieldT::zero());
+    row_vector<FieldT> c_hat_2(this->col_num_, FieldT::zero());
+    row_vector<FieldT> d_hat_2(this->col_num_, FieldT::zero());
     FieldT e_hat_2;
 
     this->open(a_hat_2, b_hat_2, c_hat_2, d_hat_2, e_hat_2, x);
@@ -216,17 +225,11 @@ bool pp_shift<FieldT>::check_related(const relate_t& a_rel,  const relate_t& b_r
 }
 
 template<typename FieldT>
-bool pp_shift<FieldT>::prove(const FieldT& y, const FieldT& x0) {
-    this->a0_ = row_vector<FieldT>::random(this->k_);
-    this->b0_ = row_vector<FieldT>::random(this->k_);
-    this->c0_ = row_vector<FieldT>::random(this->k_);
-    this->d0_ = row_vector<FieldT>::random(this->k_);
-
-    this->y_exps_ = get_exps(y, this->N_);
-    this->y_exps_inv_ = get_exps(y.inverse(), this->N_);
-    FieldT dot_product_t = row_vector<FieldT>(this->y_exps_).dot_product(row_vector<FieldT>(this->y_exps_inv_));    // y 的计算没有错
-    this->xs_ = fake_xs(x0, this->mu_);
-    this->xs_exps_ = get_compress_xs_related(this->xs_);
+bool pp_shift<FieldT>::prove() {
+    this->a0_ = row_vector<FieldT>::random(this->col_num_);
+    this->b0_ = row_vector<FieldT>::random(this->col_num_);
+    this->c0_ = row_vector<FieldT>::random(this->col_num_);
+    this->d0_ = row_vector<FieldT>::random(this->col_num_);
 
     std::vector<std::vector<std::vector<row_vector<FieldT> > > > a_hat_r(this->n_, std::vector<std::vector<row_vector<FieldT> > >(this->mu_ + 1));
     std::vector<std::vector<std::vector<row_vector<FieldT> > > > b_hat_r(this->n_, std::vector<std::vector<row_vector<FieldT> > >(this->mu_ + 1));
@@ -303,10 +306,10 @@ row_vector<FieldT> pp_shift<FieldT>::w_hat_a(const FieldT& y, const FieldT& x, c
         size_t base = (j-1) * this->m_;
         FieldT x_exp_j_inverse = x_exps[j].inverse();
         for (size_t i = 0; i <= this->m_-1; i++) {
-            sum += y_exps[this->k_ * (i + base)] * this->xs_exps_[i].inverse() * x_exp_j_inverse;
+            sum += y_exps[this->col_num_ * (i + base)] * this->xs_exps_[i].inverse() * x_exp_j_inverse;
         }
     }
-    row_vector<FieldT> y_bold(std::vector<FieldT>(y_exps.begin(), y_exps.begin()+this->k_));  // 不包含 y_exps[k]
+    row_vector<FieldT> y_bold(std::vector<FieldT>(y_exps.begin(), y_exps.begin()+this->col_num_));  // 不包含 y_exps[k]
     return y_bold * sum;
 }
 
@@ -351,8 +354,8 @@ row_vector<FieldT>& d_hat, FieldT& e_hat, const FieldT& x) const {
     }
 
     e_hat *= FieldT::zero();
-    e_hat += this->f_plus_s_.open(this->xs_);
-    e_hat += this->f_sub_s_.open(row_vector<FieldT>(this->xs_).inverse().get_all_items());
+    e_hat += this->f_plus_s_.open(this->compress_xs_);
+    e_hat += this->f_sub_s_.open(row_vector<FieldT>(this->compress_xs_).inverse().get_all_items());
     
     std::vector<FieldT> lc_gr(this->n_ * 2);
     lc_gr[this->n_] = FieldT::zero();
@@ -368,19 +371,23 @@ row_vector<FieldT>& d_hat, FieldT& e_hat, const FieldT& x) const {
 }
 
 template<typename FieldT>
-bool pp_shift<FieldT>::verify(const FieldT& y, const FieldT& x0, const FieldT& x, const bool output) const {
-    row_vector<FieldT> a_hat(this->k_, FieldT::zero());
-    row_vector<FieldT> b_hat(this->k_, FieldT::zero());
-    row_vector<FieldT> c_hat(this->k_, FieldT::zero());
-    row_vector<FieldT> d_hat(this->k_, FieldT::zero());
+bool pp_shift<FieldT>::verify(const bool output) const {
+
+    /* 选取随机挑战 */
+    FieldT x = FieldT::random_element();
+
+    row_vector<FieldT> a_hat(this->col_num_, FieldT::zero());
+    row_vector<FieldT> b_hat(this->col_num_, FieldT::zero());
+    row_vector<FieldT> c_hat(this->col_num_, FieldT::zero());
+    row_vector<FieldT> d_hat(this->col_num_, FieldT::zero());
     FieldT e_hat;
 
     this->open(a_hat, b_hat, c_hat, d_hat, e_hat, x);
 
-    row_vector<FieldT> w_hat_a_val = this->w_hat_a(y, x, this->xs_exps_);
-    row_vector<FieldT> w_hat_b_val = this->w_hat_b(y, x, this->xs_exps_);
-    row_vector<FieldT> w_hat_c_val = this->w_hat_c(y, x, this->xs_exps_);
-    row_vector<FieldT> w_hat_d_val = this->w_hat_d(y, x, this->xs_exps_);
+    row_vector<FieldT> w_hat_a_val = this->w_hat_a(this->y_, x, this->xs_exps_);
+    row_vector<FieldT> w_hat_b_val = this->w_hat_b(this->y_, x, this->xs_exps_);
+    row_vector<FieldT> w_hat_c_val = this->w_hat_c(this->y_, x, this->xs_exps_);
+    row_vector<FieldT> w_hat_d_val = this->w_hat_d(this->y_, x, this->xs_exps_);
     FieldT left = a_hat.dot_product(w_hat_a_val) + b_hat.dot_product(w_hat_b_val) +\
                   c_hat.dot_product(w_hat_c_val) + d_hat.dot_product(w_hat_d_val);
 
@@ -412,15 +419,11 @@ void shift_test() {
     row_vector_matrix<FieldT> A = B.shift();
     row_vector_matrix<FieldT> C = D.shift();
 
-    pp_shift<FieldT> shift = pp_shift<FieldT>(col_num, mu, n, A, B, C, D);
+    pp_shift<FieldT> shift = pp_shift<FieldT>(mu, n, col_num, A, B, C, D);
     shift.is_satisfy();
 
-    FieldT y  = FieldT::random_element();
-    FieldT x0 = FieldT::random_element();
-    FieldT x  = FieldT::random_element();
-
-    shift.prove(y, x0);
-    shift.verify(y, x0, x, true);
+    shift.prove();
+    shift.verify(true);
 }
 
 #endif

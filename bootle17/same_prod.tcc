@@ -34,23 +34,23 @@ pp_same_prod<FieldT>::pp_same_prod(const size_t mu, const size_t n, const size_t
 
     this->pp_prod_A_ = pp_prod<FieldT>(this->mu_, this->n_, this->col_num_, this->A_, this->A1_, this->A2_);
     this->pp_prod_B_ = pp_prod<FieldT>(this->mu_, this->n_, this->col_num_, this->B_, this->B1_, this->B2_);
-    this->pp_shift_AB_ = pp_shift<FieldT>(this->col_num_, this->mu_, this->n_, this->A1_, this->A2_, this->B1_, this->B2_);
+    this->pp_shift_AB_ = pp_shift<FieldT>(this->mu_, this->n_, this->col_num_, this->A1_, this->A2_, this->B1_, this->B2_);
 }
 
 template<typename FieldT>
-bool pp_same_prod<FieldT>::prove(const std::map<std::string, FieldT> &mid_challenges) {
-    this->pp_prod_A_.prove(mid_challenges.at("pp_prod_A_y"), mid_challenges.at("pp_prod_A_x0"));
-    this->pp_prod_B_.prove(mid_challenges.at("pp_prod_B_y"), mid_challenges.at("pp_prod_B_x0"));
-    this->pp_shift_AB_.prove(mid_challenges.at("pp_shift_AB_y"), mid_challenges.at("pp_shift_AB_x0"));
+bool pp_same_prod<FieldT>::prove() {
+    this->pp_prod_A_.prove();
+    this->pp_prod_B_.prove();
+    this->pp_shift_AB_.prove();
     return true;
 };
 
 template<typename FieldT>
-bool pp_same_prod<FieldT>::verify(const std::map<std::string, FieldT> &mid_challenges, const std::map<std::string, FieldT> &challenges, const bool output) const {
+bool pp_same_prod<FieldT>::verify(const bool output) const {
     bool result = true;
-    result &= this->pp_prod_A_.verify(mid_challenges.at("pp_prod_A_y"), mid_challenges.at("pp_prod_A_x0"), challenges.at("pp_prod_A_x"));
-    result &= this->pp_prod_B_.verify(mid_challenges.at("pp_prod_B_y"), mid_challenges.at("pp_prod_B_x0"), challenges.at("pp_prod_B_x"));
-    result &= this->pp_shift_AB_.verify(mid_challenges.at("pp_shift_AB_y"), mid_challenges.at("pp_shift_AB_x0"), challenges.at("pp_shift_AB_x"));
+    result &= this->pp_prod_A_.verify();
+    result &= this->pp_prod_B_.verify();
+    result &= this->pp_shift_AB_.verify();
     
     if ( result ) {
         if (output) printf("pp_same_prod<FieldT>::verify() \033[032mpass\033[037m\n\n");
@@ -76,28 +76,8 @@ bool same_prod_test() {
     pp_same_prod<FieldT> same_prod(mu, n, col_num, A, B);
     same_prod.is_satisfy();
 
-    /*
-        prove part
-    */
-    std::map<std::string, FieldT> mid_challenges;
-    mid_challenges["pp_prod_A_y"]   = FieldT::random_element();
-    mid_challenges["pp_prod_A_x0"]  = FieldT::random_element();
-    mid_challenges["pp_prod_B_y"]   = FieldT::random_element();
-    mid_challenges["pp_prod_B_x0"]  = FieldT::random_element();
-    mid_challenges["pp_shift_AB_y"] = FieldT::random_element();
-    mid_challenges["pp_shift_AB_x0"] = FieldT::random_element();
-
-    same_prod.prove(mid_challenges);
-
-    /*
-        verify part
-    */
-    std::map<std::string, FieldT> challenges;
-    challenges["pp_prod_A_x"]   = FieldT::random_element();
-    challenges["pp_prod_B_x"]   = FieldT::random_element();
-    challenges["pp_shift_AB_x"] = FieldT::random_element();
-
-    same_prod.verify(mid_challenges, challenges, true);
+    same_prod.prove();
+    same_prod.verify(true);
     return true;
 }
 #endif

@@ -38,6 +38,7 @@ public:
 
     row_vector<FieldT> operator+(const row_vector<FieldT> &other) const;
     row_vector<FieldT> operator-(const row_vector<FieldT> &other) const;
+    row_vector<FieldT> operator-() const;
     row_vector<FieldT> operator*(const row_vector<FieldT> &other) const;
     row_vector<FieldT> operator*(const FieldT &field_coeff) const;
     row_vector<FieldT> operator*(const integer_coeff_t integer_coeff) const;

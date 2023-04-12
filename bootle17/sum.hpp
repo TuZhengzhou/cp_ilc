@@ -4,27 +4,30 @@
 #include "structs.hpp"
 #include "structs.tcc"
 /*
-    bootle17 中的 sum 协议, prove 阶段证明者无工作, 故无 prove 函数
+  bootle17 中的 sum 协议, prove 阶段证明者无工作, 故无 prove 函数
+
+  初始化函数为: 
+  
+  pp_sum(const size_t row_num, const size_t col_num, const row_vector_matrix<FieldT>& A, \
+    const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
 */
 template<typename FieldT>
 class pp_sum {
-private:
-    size_t num_column = 0;
-    row_vector_matrix<FieldT> A;
-    row_vector_matrix<FieldT> B;
-    row_vector_matrix<FieldT> C;
-
 public:
-    pp_sum() {};
-    pp_sum(const size_t num_column): num_column(num_column) {};
-    pp_sum(const size_t num_column, const row_vector_matrix<FieldT>& A, const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
+  pp_sum() {};
+  /* 向 ILC 通道承诺 A, B, C */
+  pp_sum(const size_t row_num, const size_t col_num, const row_vector_matrix<FieldT>& A, \
+        const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
+  
+  bool is_satisfy() const;
+  bool verify(const row_vector<FieldT> row_vec, const bool output = false) const;
 
-    void set_num_column(const size_t num_column);
-    void submit_part(const char Choice, const row_vector_matrix<FieldT>& matrix);
-    void submit_all(const row_vector_matrix<FieldT>& A, const row_vector_matrix<FieldT>& B, const row_vector_matrix<FieldT>& C);
-    bool is_satisfy() const;
-
-    bool verify(const FieldT& challenge, const row_vector<FieldT> row_vec, const bool output = false) const;
+private:
+  size_t row_num_;
+  size_t col_num_;
+  row_vector_matrix<FieldT> A;
+  row_vector_matrix<FieldT> B;
+  row_vector_matrix<FieldT> C;
 };
 
 template<typename FieldT>

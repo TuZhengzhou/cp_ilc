@@ -128,6 +128,16 @@ row_vector<FieldT> row_vector<FieldT>::operator-(const row_vector<FieldT> &other
 }
 
 template<typename FieldT>
+row_vector<FieldT> row_vector<FieldT>::operator-() const {
+    std::vector<FieldT> contents;
+    size_t upper_bound = this->size();
+    for (size_t i = 0; i < upper_bound; i++) {
+        contents.emplace_back(- this->contents[i]);
+    }
+    return row_vector(contents);
+}
+
+template<typename FieldT>
 row_vector<FieldT> row_vector<FieldT>::operator*(const row_vector<FieldT> &other) const {
     assert(this->size() == other.size());
     std::vector<FieldT> contents;

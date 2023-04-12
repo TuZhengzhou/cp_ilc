@@ -6,33 +6,21 @@
 #include "eq.hpp"
 
 template<typename FieldT>
-pp_eq<FieldT>::pp_eq(const size_t num_column, const row_vector_matrix<FieldT>& A) {
-    assert(A.get_column_num() == num_column);
-    this->num_column = num_column;
-    this->A = row_vector_matrix<FieldT>(A);
-}
-
-template<typename FieldT>
-void pp_eq<FieldT>::set_num_column(const size_t num_column) {
-    this->num_column = num_column;
-}
-
-template<typename FieldT>
-void pp_eq<FieldT>::submit(const row_vector_matrix<FieldT>& matrix) {
-    assert(this->num_column > 0);
-    assert(this->num_column == matrix.get_column_num());
-
-    this->A = row_vector_matrix<FieldT>(matrix);
-    return;
+pp_eq<FieldT>::pp_eq(const size_t row_num, const size_t col_num, const row_vector_matrix<FieldT>& A) {
+    assert(A.get_row_num() == row_num);
+    assert(A.get_column_num() == col_num);
+    this->row_num_ = row_num;
+    this->col_num_ = col_num;
+    this->A_ = row_vector_matrix<FieldT>(A);
 }
 
 template<typename FieldT>
 bool pp_eq<FieldT>::is_satisfy(row_vector_matrix<FieldT>& other) const {
-    assert(this->num_column > 0UL);
-    assert(this->num_column == this->A.get_column_num() && this->num_column == other.get_column_num());
-    assert(this->A.get_row_num() == other.get_row_num());
+    assert(this->col_num_ > 0UL);
+    assert(this->col_num_ == other.get_column_num());
+    assert(this->A_.get_row_num() == other.get_row_num());
 
-    if (this->A != other) {
+    if (this->A_ != other) {
         printf("pp_eq<FieldT>::is_satisfy() \033[31mfail\033[37m\n");
         return false;
     }
@@ -40,36 +28,26 @@ bool pp_eq<FieldT>::is_satisfy(row_vector_matrix<FieldT>& other) const {
     return true;
 }
 
-// template<typename FieldT>
-// bool pp_eq<FieldT>::verify(const FieldT& challenge, const row_vector<FieldT>& row_vec, const bool output) const {
-//     assert(this->num_column > 0UL);
-//     assert(this->num_column == this->A.get_column_num() && this->num_column == row_vec.size());
-
-//     std::vector<FieldT> x_exps = get_exps<FieldT>(challenge, this->A.get_row_num());
-//     row_vector<FieldT> A_open = this->A.open(std::vector<FieldT>(x_exps.begin()+1, x_exps.end()));
-
-//     if (A_open != row_vec) {
-//         if (output) printf("pp_eq<FieldT>::verify() \033[31mfail\033[37m\n\n");
-//         return false;
-//     }
-//     if (output) printf("pp_eq<FieldT>::verify() \033[32mpass\033[37m\n\n");
-//     return true;
-// }
-
 template<typename FieldT>
-bool pp_eq<FieldT>::verify(const FieldT& challenge, const row_vector_matrix<FieldT>& pub_matrix, const bool output) const {
-    assert(this->num_column > 0UL);
-    assert(this->num_column == this->A.get_column_num() && this->num_column == pub_matrix.get_column_num());
+bool pp_eq<FieldT>::verify(const row_vector_matrix<FieldT>& pub_matrix, const bool output) const {
+    assert(this->col_num_ > 0UL);
+    assert(this->col_num_ == pub_matrix.get_column_num());
 
-    std::vector<FieldT> x_exps = get_exps<FieldT>(challenge, this->A.get_row_num());
-    row_vector<FieldT> A_open = this->A.open(std::vector<FieldT>(x_exps.begin()+1, x_exps.end()));
+    /* 随机挑战 */
+    const FieldT challenge = FieldT::random_element();
 
-    row_vector<FieldT> result = row_vector<FieldT>::all_zero(pub_matrix.get_column_num());
+    /* 向 ILC　通道查询 open 结果 */
+    std::vector<FieldT> x_exps = get_exps<FieldT>(challenge, this->A_.get_row_num());
+    row_vector<FieldT>  open = this->A_.open(std::vector<FieldT>(x_exps.begin()+1, x_exps.end()));
+
+    /* 根据公共矩阵自行计算 期望计算结果 */
+    row_vector<FieldT> expected_result = row_vector<FieldT>::all_zero(pub_matrix.get_column_num());
     for (size_t i = 0; i < pub_matrix.get_row_num(); i++) {
-        result += pub_matrix.get_row(i) * x_exps[i+1];
+        expected_result += pub_matrix.get_row(i) * x_exps[i+1];
     }
 
-    if (A_open != result) {
+    /* 比较 open 结果与 期望计算结果 */
+    if (open != expected_result) {
         if (output) printf("pp_eq<FieldT>::verify() \033[31mfail\033[37m\n\n");
         return false;
     }
@@ -83,22 +61,13 @@ void eq_test() {
     size_t row_num = std::rand() % 256;
     row_vector_matrix<FieldT> A = row_vector_matrix<FieldT>::random(row_num, col_num);
 
-    pp_eq<FieldT> eq;
-    eq.set_num_column(col_num);
-    eq.submit(A);
+    pp_eq<FieldT> eq = pp_eq<FieldT>(row_num, col_num, A);
 
     bool satisfy_result = eq.is_satisfy(A);
     assert(satisfy_result == true);
 
-    FieldT challenge = FieldT::one() * (std::rand() % 10000000000000001UL);
-    // row_vector<FieldT> result = row_vector<FieldT>::all_zero(col_num);
-    // FieldT coeff = challenge;
-    // for (size_t i = 0; i < row_num; i++) {
-    //     result += A.get_row(i) * coeff;
-    //     coeff *= challenge;
-    // }
-    // bool verify_result = eq.verify(challenge, result, true);
-    bool verify_result = eq.verify(challenge, A, true);
+    /* 验证 */
+    bool verify_result = eq.verify(A, true);
     assert(verify_result == true);
 }
 #endif

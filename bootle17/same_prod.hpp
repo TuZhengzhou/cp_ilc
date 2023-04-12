@@ -29,11 +29,9 @@ public:
   pp_same_prod(const size_t mu, const size_t n, const size_t k, const row_vector_matrix<FieldT>& A, const row_vector_matrix<FieldT>& B);
 
   bool is_satisfy() const;
-  /*
-    需要完成 3 个子模块的证明
-  */
-  bool prove(const std::map<std::string, FieldT> &mid_challenges);
-  bool verify(const std::map<std::string, FieldT> &mid_challenges, const std::map<std::string, FieldT> &challenges, const bool output = false) const;
+  bool prove();
+  bool verify(const bool output = false) const;
+
 private:
   size_t mu_, m_, n_, col_num_;
   row_vector_matrix<FieldT> A_,  B_;

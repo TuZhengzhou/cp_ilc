@@ -1,33 +1,41 @@
-libsnark merkle circuit example
+language: cpp
+sudo: required
+dist: trusty
+compiler:
+  - gcc
+os:
+  - linux
 
-The example shows how to generate proof for one merkle path on one merkle tree with depth 3.
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-5
+      - g++-5
 
-1/ init 
- ```
- git submodule update --init --recursive
- ```
-2/ compile
- ```
- mkdir build; cd build; cmake ..; make
- ```
- You can find the "merkle" binary under the merkle folder.
+before_install:
+  - sudo apt-get install build-essential cmake git libboost-all-dev cmake libgmp3-dev libssl-dev libprocps3-dev pkg-config gnuplot-x11 python-markdown
 
-3/ setup
-```
-./merkle setup
-```
+before_script:
+  - git submodule init && git submodule update
+  - mkdir build
+  - cd build
+  - cmake ..
 
-4/ prove
-```
-./merkle prove [data1] [data2] [data3] [data4] [data5] [data6] [data7] [data8] [index]
-```
-Record down the root information, which is used on verify.
+script:
+  - make
+  - make check
 
-for example:
-run ./merkle prove 1 2 3 4 5 6 7 8 7
-will output: root is f171e00bb40c83de1f09c64e2cc4558e3c327aa9e8525a467c83576071bc1045
+notifications:
+  email: false
 
-5/ verify
-```
-./merkle verify [root]
-```
+报错：用 make 编译可执行文件时报错 error: #error C++ versions less than C++14 are not supported.
+解决：前一步骤 cmake 时，不执行 cmake ..，而是执行 cmake -DCMAKE_CXX_STANDARD=14 ..
+参考：https://blog.csdn.net/hit0803107/article/details/118441830
+
+参数：EXCLUDE_FROM_ALL
+作用：cmake 的 add_library, add_executable, add_subdirectory 等命令都有一个 EXCLUDE_FROM_ALL 参数.
+根据cmake官网的解释，如果某个 target 或 subdirectory 被设置为 EXCLUDE_FROM_ALL 属性,那么这个 target (或这个 subdirectory 中的所有 target )就会被排除在 all target 列表之外，这样，当执行默认的 make(或nmake) 时，这个 target(或这个subdirectory中的所有target) 就不会被编译
+需要时：手动 make [target] 编译 [target]
+例如：make gadgetlib1_simple_test

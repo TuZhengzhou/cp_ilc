@@ -2,12 +2,42 @@
 #define BOOTLE_ILC_TCC
 #include <random>
 #include <chrono>
+#include <iostream>
+#include <string>
+#include <map>
 #include "ILC.hpp"
+#include "utils.hpp"
 #include "libff/common/profiling.hpp"
+
+using namespace std;
 
 size_t COM_NUM = 1;
 const size_t G1_TO_G1_TIMES_MIN = 10;
 const size_t G1_TO_G1_TIMES_MAX = 100;
+const size_t EXP_PER_COM = 2;
+const size_t GATES_PER_EXP = (size_t)254 * 65;
+const size_t MUL_GATES_PER_EXP = (size_t)254 * 30;
+const size_t ADD_GATES_PER_EXP = (size_t)254 * 35;
+const size_t WIRE_PER_GATE = 3;
+
+const double ADD_PARTIAL = 6.0;
+const double MUL_PARTIAL = 7.0;
+
+//   ret["mu"] = mu;
+//   ret[ARG::M]  = m;
+//   ret[ARG::N_A] = n_A;
+//   ret[ARG::N_M] = n_M;
+//   ret[ARG::ROW_NUM] = row_num;
+//   ret[ARG::COL_NUM] = col_num;
+enum ARG {
+    MU,
+    M,
+    N_A,
+    N_M,
+    ROW_NUM,
+    COL_NUM
+};
+
 
 template <typename FieldT, typename ppT, typename HType>
 bool pp_ILC<FieldT, ppT, HType>::get_random_source(const size_t add_num, const size_t multiply_num, FieldT& source_val, size_t& source_idx_in_V) {
@@ -219,6 +249,49 @@ bool pp_ILC<FieldT, ppT, HType>::verify(const bool output) {
     return false;
 }
 
+inline size_t get_num_gate_before(size_t exp_iter) {
+    return (pow(2, exp_iter) * (ADD_PARTIAL + MUL_PARTIAL)) * 90;
+}
+
+inline size_t get_num_gate_with_commit(size_t exp_iter, size_t num_commit) {
+    return get_num_gate_before(exp_iter) + num_commit * EXP_PER_COM * (MUL_GATES_PER_EXP + ADD_GATES_PER_EXP);
+}
+
+map<size_t, size_t> generate_circuit_size_arguments(size_t exp_iter, size_t commit_num) {
+  size_t m, mu, n_A, n_M, row_num, col_num;
+  size_t num_gate_commit;
+  double num_gate_before, num_gate, num_gate_apos, num_wire, sq, row_A, row_M, n;
+
+  /** first cal the size of origin circuit */
+  num_gate_before = get_num_gate_before(exp_iter);
+  num_gate = get_num_gate_with_commit(exp_iter, commit_num);
+
+  num_wire = num_gate * WIRE_PER_GATE;
+  sq       = sqrt(num_wire);
+  row_A    = sq * (ADD_PARTIAL) / (ADD_PARTIAL + MUL_PARTIAL);
+  row_M    = sq * (MUL_PARTIAL) / (ADD_PARTIAL + MUL_PARTIAL);
+  n     = sq / std::pow(2, exp_iter);
+  n_A   = row_A / std::pow(2, exp_iter); 
+  n_M   = row_M / std::pow(2, exp_iter);
+
+  /** minimize nlogn + mn */
+  solveOptimizationProblem(row_A, row_M, n_A, n_M, mu);
+  m = (size_t)std::pow(2, mu);
+
+  row_num = (n_A + n_M) * m;
+  col_num = (size_t)std::ceil(num_gate / row_num);
+  num_gate_apos = row_num * col_num;
+
+  map<size_t, size_t> ret;
+  ret[ARG::MU] = mu;
+  ret[ARG::M]  = m;
+  ret[ARG::N_A] = n_A;
+  ret[ARG::N_M] = n_M;
+  ret[ARG::ROW_NUM] = row_num;
+  ret[ARG::COL_NUM] = col_num;
+
+  return ret;
+}
 
 template <typename FieldT, typename ppT, typename HType>
 pp_ILC<FieldT, ppT, HType> pp_ILC<FieldT, ppT, HType>::random(const size_t mu_A, const size_t mu_M, const size_t mu_V, \
@@ -255,10 +328,10 @@ pp_ILC<FieldT, ppT, HType> pp_ILC<FieldT, ppT, HType>::random(const size_t mu_A,
     result.D_ = row_vector_matrix<FieldT>::random(result.row_num_M_, result.col_num_);
     result.E_ = row_vector_matrix<FieldT>::random(result.row_num_M_, result.col_num_);
 
-    // const size_t com_num = result.col_num_;
-    const size_t com_num = std::min(COM_NUM, result.col_num_);
-    /* 修改承诺输入为加法乘法各 com_num 个, 对应行的其他位置填充 0 */
-    for (size_t i = com_num; i < result.col_num_; i++) {
+    // const size_t num_commit = result.col_num_;
+    const size_t num_commit = std::min(COM_NUM, result.col_num_);
+    /* 修改承诺输入为加法乘法各 num_commit 个, 对应行的其他位置填充 0 */
+    for (size_t i = num_commit; i < result.col_num_; i++) {
         result.A_.set_item(i, FieldT::zero());
         result.D_.set_item(i, FieldT::zero());
     }
@@ -378,11 +451,11 @@ pp_ILC<FieldT, ppT, HType> pp_ILC<FieldT, ppT, HType>::random(const size_t mu_A,
 
         std::vector<FieldT> as1 = result.A_.get_row(0).get_all_items();
         std::vector<FieldT> as2 = result.D_.get_row(0).get_all_items();
-        std::vector<FieldT> rs1 = row_vector<FieldT>::random(com_num).get_all_items();
-        std::vector<FieldT> rs2 = row_vector<FieldT>::random(com_num).get_all_items();
-        std::vector<CommitT> coms1 = std::vector<CommitT>(com_num);
-        std::vector<CommitT> coms2 = std::vector<CommitT>(com_num);
-        for (size_t i = 0; i < com_num; i++) {
+        std::vector<FieldT> rs1 = row_vector<FieldT>::random(num_commit).get_all_items();
+        std::vector<FieldT> rs2 = row_vector<FieldT>::random(num_commit).get_all_items();
+        std::vector<CommitT> coms1 = std::vector<CommitT>(num_commit);
+        std::vector<CommitT> coms2 = std::vector<CommitT>(num_commit);
+        for (size_t i = 0; i < num_commit; i++) {
             coms1[i] = CommitT(as1[i] * g_base, rs1[i] * h_base);
             coms2[i] = CommitT(as2[i] * g_base, rs2[i] * h_base);
         }
@@ -392,8 +465,8 @@ pp_ILC<FieldT, ppT, HType> pp_ILC<FieldT, ppT, HType>::random(const size_t mu_A,
         com_add.add_row_vector (row_vector<FieldT>(std::vector<FieldT>(result.A_.get_row(0).get_all_items())));
         com_mult.add_row_vector(row_vector<FieldT>(std::vector<FieldT>(result.D_.get_row(0).get_all_items())));
 
-        result.comEq_add_  = pp_comEq<FieldT, ppT, HType>(0, 1, result.col_num_, com_num, com_add , rs1, g_base, h_base, coms1);
-        result.comEq_mult_ = pp_comEq<FieldT, ppT, HType>(0, 1, result.col_num_, com_num, com_mult, rs2, g_base, h_base, coms2);
+        result.comEq_add_  = pp_comEq<FieldT, ppT, HType>(0, 1, result.col_num_, num_commit, com_add , rs1, g_base, h_base, coms1);
+        result.comEq_mult_ = pp_comEq<FieldT, ppT, HType>(0, 1, result.col_num_, num_commit, com_mult, rs2, g_base, h_base, coms2);
         
         libff::leave_block("prepare comEq");
     }
@@ -402,44 +475,42 @@ pp_ILC<FieldT, ppT, HType> pp_ILC<FieldT, ppT, HType>::random(const size_t mu_A,
 }
 
 template <typename FieldT, typename ppT, typename HType>
-bool ILC_test_origin(const size_t mu, const size_t times_of_col, double& prove_time, double& verifiy_time) {
-    size_t mu_A, mu_M, mu_V, n_A, n_M, n_V, row_num, col_num;
-    size_t m_A, m_M, m;  /* 加法行向量个数, 乘法行向量个数, 行向量总数 */
+bool ILC_test_origin(const size_t exp_iter, std::map<size_t, size_t> circuit_arguments) {
+    size_t mu, m, n_A, n_M, n_V, row_num, col_num;
+    size_t row_A, row_M;  /* 加法行向量个数, 乘法行向量个数, 行向量总数 */
   
     permutation<tuple_dim2_t, 2> PI;
     row_vector_matrix<FieldT> U;
   
     row_vector_matrix<FieldT> V;
     row_vector_matrix<FieldT> A, B, C, D, E, F;
+    
+    mu = circuit_arguments[ARG::MU];
+    m  = circuit_arguments[ARG::M];
+    n_A = circuit_arguments[ARG::N_A];
+    n_M = circuit_arguments[ARG::N_M];
+    row_num = circuit_arguments[ARG::ROW_NUM];
+    col_num = circuit_arguments[ARG::COL_NUM];
 
-    /* 加法-乘法比例与 椭圆曲线上点乘的加法-乘法比例相同，为 16: 2 */
-    mu_A = mu;
-    n_A  = 16;  /* 2^3 * 16 = 128 */
-    mu_M = mu;
-    n_M  = 2;   /* 2^3 * 2 = 16 */
-    mu_V = mu;
-    n_V  = 18 * 3;  /* 2^3 * 54 = 432 */
-    row_num = 54 * std::pow(2, mu);
-    col_num = 50 * std::pow(2, mu) * times_of_col + (size_t)std::ceil(FieldT::size_in_bits() * 18 * (1 + 1) * COM_NUM * 3 / row_num);
-    m_A = std::pow(2, mu_A) * n_A;
-    m_M = std::pow(2, mu_M) * n_M;
-    m = m_A +m_M;
+    row_A = m * n_A;
+    row_M = m * n_M;
+    n_V   = 3 * (n_A + n_M);
 
-    A = row_vector_matrix<FieldT>::random(m_A, col_num);
-    B = row_vector_matrix<FieldT>::random(m_A, col_num);
+    A = row_vector_matrix<FieldT>::random(row_A, col_num);
+    B = row_vector_matrix<FieldT>::random(row_A, col_num);
     C = A + B;
 
-    D = row_vector_matrix<FieldT>::random(m_M, col_num);
-    E = row_vector_matrix<FieldT>::random(m_M, col_num);
+    D = row_vector_matrix<FieldT>::random(row_M, col_num);
+    E = row_vector_matrix<FieldT>::random(row_M, col_num);
     F = D * E;
 
     V = row_vector_matrix<FieldT>(col_num);
-    for (size_t i = 0; i < m_A; i++) V.add_row_vector(A.get_row(i));
-    for (size_t i = 0; i < m_A; i++) V.add_row_vector(B.get_row(i));
-    for (size_t i = 0; i < m_A; i++) V.add_row_vector(C.get_row(i));
-    for (size_t i = 0; i < m_M; i++) V.add_row_vector(D.get_row(i));
-    for (size_t i = 0; i < m_M; i++) V.add_row_vector(E.get_row(i));
-    for (size_t i = 0; i < m_M; i++) V.add_row_vector(F.get_row(i));
+    for (size_t i = 0; i < row_A; i++) V.add_row_vector(A.get_row(i));
+    for (size_t i = 0; i < row_A; i++) V.add_row_vector(B.get_row(i));
+    for (size_t i = 0; i < row_A; i++) V.add_row_vector(C.get_row(i));
+    for (size_t i = 0; i < row_M; i++) V.add_row_vector(D.get_row(i));
+    for (size_t i = 0; i < row_M; i++) V.add_row_vector(E.get_row(i));
+    for (size_t i = 0; i < row_M; i++) V.add_row_vector(F.get_row(i));
 
     size_t cycle_len = 1;   /* 设置为 1, 即不进行排列变换 */
     size_t cycle_num = row_num / 2;
@@ -463,139 +534,129 @@ bool ILC_test_origin(const size_t mu, const size_t times_of_col, double& prove_t
     for (size_t i = 0; i < row_num / 3; i++) {
         S.emplace_back(dis(gen) % row_num);
     } 
-    // std::cout << S << std::endl;
-    // std::cout << "V_row: " << V.get_row_num() << ", V_col: " << V.get_column_num() << std::endl;
 
-    pp_ILC<FieldT, ppT, HType> ILC = pp_ILC<FieldT, ppT, HType>(mu_A, mu_M, mu_V, n_A, n_M, n_V, col_num, V, PI, S, false);
+    // pp_ILC<FieldT, ppT, HType> ILC = pp_ILC<FieldT, ppT, HType>(mu_A, mu_M, mu_V, n_A, n_M, n_V, col_num, V, PI, S, false);
+    pp_ILC<FieldT, ppT, HType> ILC = pp_ILC<FieldT, ppT, HType>(mu, mu, mu, n_A, n_M, n_V, col_num, V, PI, S, false);
 
-    std::chrono::_V2::steady_clock::time_point start, end;
-    std::chrono::duration<int64_t, std::nano>  diff;
+    libff::enter_block("0 - NO-CP TOTAL");
 
-    start = std::chrono::steady_clock::now(); // 记录开始时间
+    libff::enter_block("0 - NO-CP PROVE");
     ILC.prove();
-    end = std::chrono::steady_clock::now(); // 记录结束时间
-    diff = end - start; // 计算时间差
-    prove_time = std::chrono::duration<double, std::milli>(diff).count();
-    
-    start = std::chrono::steady_clock::now(); // 记录开始时间
+    libff::leave_block("0 - NO-CP PROVE");
+
+    libff::enter_block("0 - NO-CP VERIFY");
     ILC.verify();
-    end = std::chrono::steady_clock::now(); // 记录结束时间
-    diff = end - start; // 计算时间差
-    verifiy_time = std::chrono::duration<double, std::milli>(diff).count();
+    libff::leave_block("0 - NO-CP VERIFY");
+
+    libff::leave_block("0 - NO-CP TOTAL");
+
 
     return true;
     
 }
 
 template <typename FieldT, typename ppT, typename HType>
-bool ILC_test_with_com_input(const size_t mu, const size_t times_of_col, double& prove_time, double& verifiy_time) {
-    size_t mu_A, mu_M, mu_V, n_A, n_M, n_V, row_num, col_num;
+bool ILC_test_with_com_input(const size_t exp_iter, std::map<size_t, size_t> circuit_arguments) {
+    size_t mu, m, col_num;
+    size_t row_A, n_A;
+    size_t row_M, n_M;
+    size_t row_num, n_V;
 
-    // mu_A = 4;
-    // n_A  = 3;  /* 2^4 * 3 = 48 */
-    // mu_M = 4;
-    // n_M  = 9;  /* 2^4 * 9 = 144 */
-    // mu_V = 6;
-    // n_V  = 9;  /* 2^6 * 3 = 192 */
-    // // row_num = 576;
-    // col_num = 192;
+    mu = circuit_arguments[ARG::MU];
+    m  = circuit_arguments[ARG::M];
+    col_num = circuit_arguments[ARG::COL_NUM];
 
-
-    /* 加法-乘法比例与 椭圆曲线上点乘的加法-乘法比例相同，为 16: 2 */
-    // mu_A = 3;
-    // n_A  = 16;  /* 2^3 * 16 = 128 */
-    // mu_M = 3;
-    // n_M  = 2;   /* 2^3 * 2 = 16 */
-    // mu_V = 3;
-    // n_V  = 18 * 3;  /* 2^3 * 54 = 432 */
-    // // row_num = 432;
-    // col_num = 192;
-
-    mu_A = mu;
-    n_A  = 16;  /* 2^3 * 16 = 128 */
-    mu_M = mu;
-    n_M  = 2;   /* 2^3 * 2 = 16 */
-    mu_V = mu;
-    n_V  = 18 * 3;  /* 2^0 * 54 = 54 */
-    // row_num = 54;
-    col_num = 50 * std::pow(2, mu)  * times_of_col;
+    n_A = circuit_arguments[ARG::N_A];
+    n_M = circuit_arguments[ARG::N_M];
+    n_V   = 3 * (n_A + n_M);
+    row_A = m * n_A;
+    row_M = m * n_M;
+    row_num = circuit_arguments[ARG::ROW_NUM];
 
     std::chrono::_V2::steady_clock::time_point start, end;
     std::chrono::duration<int64_t, std::nano>  diff;
 
-    start = std::chrono::steady_clock::now(); // 记录开始时间
-    pp_ILC<FieldT, ppT, HType> ILC_random = pp_ILC<FieldT, ppT, HType>::random(mu_A, mu_M, mu_V, n_A, n_M, n_V, col_num, true);
-    end = std::chrono::steady_clock::now(); // 记录结束时间
-    diff = end - start; // 计算时间差
-    // std::cout << "pp_ILC<FieldT, ppT>::random Time taken: " 
-    //           << std::chrono::duration<double, std::micro>(diff).count() 
-    //           << " us" << std::endl; // 输出时间差（单位为毫秒）
+    pp_ILC<FieldT, ppT, HType> ILC_random = pp_ILC<FieldT, ppT, HType>::random(mu, mu, mu, n_A, n_M, n_V, col_num, true);
 
-    start = std::chrono::steady_clock::now(); // 记录开始时间
+    libff::enter_block("1 - CP TOTAL");
+
+    libff::enter_block("1 - CP PROVE");
     ILC_random.prove();
-    end = std::chrono::steady_clock::now(); // 记录结束时间
-    diff = end - start; // 计算时间差
-    prove_time = std::chrono::duration<double, std::milli>(diff).count();
-    
-    start = std::chrono::steady_clock::now(); // 记录开始时间
+    libff::leave_block("1 - CP PROVE");
+
+    libff::enter_block("1 - CP VERIFY");
     ILC_random.verify();
-    end = std::chrono::steady_clock::now(); // 记录结束时间
-    diff = end - start; // 计算时间差
-    verifiy_time = std::chrono::duration<double, std::milli>(diff).count();
+    libff::leave_block("1 - CP VERIFY");
+
+    libff::leave_block("1 - CP TOTAL");
 
     return true;
 }
 
+string effeciency_print_no_cp() {
+  libff::inhibit_profiling_info = false;
+  libff::print_cumulative_time_entry("0 - NO-CP TOTAL");
+  libff::print_cumulative_time_entry("0 - NO-CP PROVE");
+  libff::print_cumulative_time_entry("0 - NO-CP VERIFY");
+  // libff::print_cumulative_op_counts();
+  // libff::print_time("0 - NO-CP TOTAL");
+  // libff::print_time("0 - NO-CP PROVE");
+  // libff::print_time("0 - NO-CP VERIFY");
+  libff::inhibit_profiling_info = true;
+
+  return string("place holder");
+}
+
+string effeciency_print_cp() {
+  libff::inhibit_profiling_info = false;
+  libff::print_cumulative_time_entry("1 - CP TOTAL");
+  libff::print_cumulative_time_entry("1 - CP PROVE");
+  libff::print_cumulative_time_entry("1 - CP VERIFY");
+  // libff::print_cumulative_op_counts();
+  // libff::print_time("1 - CP TOTAL");
+  // libff::print_time("1 - CP PROVE");
+  // libff::print_time("1 - CP VERIFY");
+  libff::inhibit_profiling_info = true;
+
+  return string("place holder");
+}
 /* 
-  承诺数量固定为 1，电路变大（行数固定，增加列数）
+  承诺数量固定为 1，电路变大
 */
 template <typename FieldT, typename ppT, typename HType>
 void ILC_test_compare_1() {
 
-    size_t mu, times_of_col, repeat;
-    double t1_prove, t1_verify, t1_prove_total, t1_verify_total;
-    double t2_prove, t2_verify, t2_prove_total, t2_verify_total;
+  size_t exp_iter, repeat, num_commit;
+  size_t num_gate_before, num_gate_after, num_gate_apos;
+  std::map<size_t, size_t> circuit_arguments;
 
-    size_t row_num, col_before, col_after;
-    double gates_before, gates_after;
+  repeat = 10;
+  num_commit = 1;
+  printf("\n-----------------------------------------------------------------------------------------------\n");
+  printf("情形 1 下对比实验结果， 重复次数为 %ld\n", repeat);
 
-    repeat = 1;
-    mu = 1;
+  for (exp_iter = 1; exp_iter < 6; exp_iter++) {
 
-    printf("\n-----------------------------------------------------------------------------------------------\n");
-    printf("情形 1 下对比实验结果， 重复次数为 %ld\n", repeat);
-    printf("承诺输入数量   原电路门数量(× 1000)  电路门总数(× 1000)  新协议证明时间(ms) 朴素方案证明时间(ms)  新协议验证时间(ms)  朴素方案验证时间(ms)\n");
+    printf("iter = %lu\n", exp_iter);
 
+    num_gate_before = get_num_gate_before(exp_iter);
+    num_gate_after  = get_num_gate_with_commit(exp_iter, num_commit);
+    printf("num_commit = %8lu num_gate_before = %8lu num_gate_after = %8lu\n", num_commit, num_gate_before, num_gate_after);
 
-    for (times_of_col = 1; times_of_col < 5; times_of_col++) {
-        COM_NUM = 1;
-        t1_prove_total  = 0.0;
-        t1_verify_total = 0.0;
-        t2_prove_total  = 0.0;
-        t2_verify_total = 0.0;
-        for (size_t i = 0; i < repeat; i++) {
-            ILC_test_origin<FieldT, ppT, HType>(mu, times_of_col, t1_prove, t1_verify);
-            ILC_test_with_com_input<FieldT, ppT, HType>(mu, times_of_col, t2_prove, t2_verify);
-            t1_prove_total  += t1_prove;
-            t1_verify_total += t1_verify;
-            t2_prove_total  += t2_prove;
-            t2_verify_total += t2_verify;
-        }
-        t1_prove_total  /= repeat;
-        t1_verify_total /= repeat;
-        t2_prove_total  /= repeat;
-        t2_verify_total /= repeat;
-
-        row_num = 54 * std::pow(2, mu);
-        col_before = 50 * std::pow(2, mu) * times_of_col;
-        col_after  = col_before + (size_t)std::ceil(FieldT::size_in_bits() * 18 * (1 + 1) * COM_NUM * 3 / row_num);
-
-        gates_before = row_num * col_before / 3.0 / 1000.0;
-        gates_after  = row_num * col_after  / 3.0 / 1000.0;
-        printf("%8ld %16.2lf %20.2lf %20.2lf %20.2lf %20.2lf %20.2lf\n", COM_NUM, gates_before, gates_after, t2_prove_total, t1_prove_total, t2_verify_total, t1_verify_total);
-        // printf("ILC_test_origin::             prove : %.2f ms, verify: %.2f ms\n", t1_prove_total, t1_verify_total);
-        // printf("ILC_test_with_com_input::     prove : %.2f ms, verify: %.2f ms\n", t2_prove_total, t2_verify_total);
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, num_commit);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_origin<FieldT, ppT, HType>(exp_iter, circuit_arguments);
     }
+    effeciency_print_no_cp();
+
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, 0);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_with_com_input<FieldT, ppT, HType>(exp_iter, circuit_arguments);
+    }
+    effeciency_print_cp();
+  }
 }
 
 /* 
@@ -605,51 +666,37 @@ void ILC_test_compare_1() {
 template <typename FieldT, typename ppT, typename HType>
 void ILC_test_compare_2() {
 
-    size_t mu, times_of_col, com_num, repeat;
-    double t1_prove, t1_verify, t1_prove_total, t1_verify_total;
-    double t2_prove, t2_verify, t2_prove_total, t2_verify_total;
+  size_t exp_iter, repeat, num_commit;
+  size_t num_gate_before, num_gate_after, num_gate_apos;
+  std::map<size_t, size_t> circuit_arguments;
 
-    size_t row_num, col_before, col_after;
-    double gates_before, gates_after;
+  repeat = 10;
+  exp_iter = 4;
+  printf("\n-----------------------------------------------------------------------------------------------\n");
+  printf("情形 2 下对比实验结果， 重复次数为 %ld\n", repeat);
 
-    repeat = 1;
-    mu = 1;
-    times_of_col = 1;
+  for (num_commit = 1; num_commit <= 32; num_commit *= 2) {
 
-    printf("\n-----------------------------------------------------------------------------------------------\n");
-    printf("情形 2 下对比实验结果， 重复次数为 %ld\n", repeat);
-    printf("承诺输入数量   原电路门数量(× 1000)  电路门总数(× 1000)  新协议证明时间(ms) 朴素方案证明时间(ms)  新协议验证时间(ms)  朴素方案验证时间(ms)\n");
-    
-    for (com_num = 1; com_num < 64; com_num *= 2) {
-        COM_NUM = com_num;
-        t1_prove_total  = 0.0;
-        t1_verify_total = 0.0;
-        t2_prove_total  = 0.0;
-        t2_verify_total = 0.0;
-        for (size_t i = 0; i < repeat; i++) {
-            ILC_test_origin<FieldT, ppT, HType>(1, 1, t1_prove, t1_verify);
-            ILC_test_with_com_input<FieldT, ppT, HType>(1, 1, t2_prove, t2_verify);
-            t1_prove_total  += t1_prove;
-            t1_verify_total += t1_verify;
-            t2_prove_total  += t2_prove;
-            t2_verify_total += t2_verify;
-        }
-        t1_prove_total  /= repeat;
-        t1_verify_total /= repeat;
-        t2_prove_total  /= repeat;
-        t2_verify_total /= repeat;
+    printf("iter = %lu\n", exp_iter);
 
-        row_num = 54 * std::pow(2, mu);
-        col_before = 50 * std::pow(2, mu) * times_of_col;
-        col_after  = col_before + (size_t)std::ceil(FieldT::size_in_bits() * 18 * (1 + 1) * COM_NUM * 3 / row_num);
+    num_gate_before = get_num_gate_before(exp_iter);
+    num_gate_after  = get_num_gate_with_commit(exp_iter, num_commit);
+    printf("num_commit = %8lu num_gate_before = %8lu num_gate_after = %8lu\n", num_commit, num_gate_before, num_gate_after);
 
-        gates_before = row_num * col_before / 3.0 / 1000.0;
-        gates_after  = row_num * col_after  / 3.0 / 1000.0;
-        printf("%8ld %16.2lf %20.2lf %20.2lf %20.2lf %20.2lf %20.2lf\n", COM_NUM, gates_before, gates_after, t2_prove_total, t1_prove_total, t2_verify_total, t1_verify_total);
-        // printf("%8ld %16ld %20ld %20.2lf %20.2lf %20.2lf %20.2lf\n", COM_NUM, 0, 0, t2_prove_total, t1_prove_total, t2_verify_total, t1_verify_total);
-        // printf("ILC_test_origin::             prove : %.2f ms, verify: %.2f ms\n", t1_prove_total, t1_verify_total);
-        // printf("ILC_test_with_com_input::     prove : %.2f ms, verify: %.2f ms\n", t2_prove_total, t2_verify_total);
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, num_commit);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_origin<FieldT, ppT, HType>(exp_iter, circuit_arguments);
     }
+    effeciency_print_no_cp();
+
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, 0);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_with_com_input<FieldT, ppT, HType>(exp_iter, circuit_arguments);
+    }
+    effeciency_print_cp();
+  }
 }
 
 /*
@@ -658,50 +705,40 @@ void ILC_test_compare_2() {
 template <typename FieldT, typename ppT, typename HType>
 void ILC_test_compare_3() {
 
-    size_t mu, times_of_col, com_num, repeat;
-    double t1_prove, t1_verify, t1_prove_total, t1_verify_total;
-    double t2_prove, t2_verify, t2_prove_total, t2_verify_total;
+  size_t exp_iter, repeat, num_commit;
+  size_t num_gate_before, num_gate_after, num_gate_apos;
+  std::map<size_t, size_t> circuit_arguments;
 
-    size_t row_num, col_before, col_after;
-    double gates_before, gates_after;
+  repeat = 10;
+  exp_iter = 2;
+  printf("\n-----------------------------------------------------------------------------------------------\n");
+  printf("情形 3 下对比实验结果， 重复次数为 %ld\n", repeat);
 
-    repeat = 1;
-    mu = 1;
+  for (exp_iter = 1; exp_iter <= 5; exp_iter++) {
 
-    printf("\n-----------------------------------------------------------------------------------------------\n");
-    printf("情形 3 下对比实验结果， 重复次数为 %ld\n", repeat);
-    printf("承诺输入数量   原电路门数量(× 1000)  电路门总数(× 1000)  新协议证明时间(ms) 朴素方案证明时间(ms)  新协议验证时间(ms)  朴素方案验证时间(ms)\n");
+    num_commit = pow(2, exp_iter);
 
-    for (com_num = 1; com_num < 6; com_num++) {
-        COM_NUM = com_num * 5;
-        t1_prove_total  = 0.0;
-        t1_verify_total = 0.0;
-        t2_prove_total  = 0.0;
-        t2_verify_total = 0.0;
-        for (size_t i = 0; i < repeat; i++) {
-            ILC_test_origin<FieldT, ppT, HType>(mu, com_num, t1_prove, t1_verify);
-            ILC_test_with_com_input<FieldT, ppT, HType>(mu, com_num, t2_prove, t2_verify);
-            t1_prove_total  += t1_prove;
-            t1_verify_total += t1_verify;
-            t2_prove_total  += t2_prove;
-            t2_verify_total += t2_verify;
-        }
-        t1_prove_total  /= repeat;
-        t1_verify_total /= repeat;
-        t2_prove_total  /= repeat;
-        t2_verify_total /= repeat;
+    printf("iter = %lu\n", exp_iter);
 
-        times_of_col = com_num;
-        row_num = 54 * std::pow(2, mu);
-        col_before = 50 * std::pow(2, mu) * times_of_col;
-        col_after  = col_before + (size_t)std::ceil(FieldT::size_in_bits() * 18 * (1 + 1) * COM_NUM * 3 / row_num);
+    
 
-        gates_before = row_num * col_before / 3.0 / 1000.0;
-        gates_after  = row_num * col_after  / 3.0 / 1000.0;
-        printf("%8ld %16.2lf %20.2lf %20.2lf %20.2lf %20.2lf %20.2lf\n", COM_NUM, gates_before, gates_after, t2_prove_total, t1_prove_total, t2_verify_total, t1_verify_total);
-        // printf("%8ld %16ld %20ld %20.2lf %20.2lf %20.2lf %20.2lf\n", COM_NUM, 0, 0, t2_prove_total, t1_prove_total, t2_verify_total, t1_verify_total);
-        // printf("ILC_test_origin::             prove : %.2f ms, verify: %.2f ms\n", t1_prove_total, t1_verify_total);
-        // printf("ILC_test_with_com_input::     prove : %.2f ms, verify: %.2f ms\n", t2_prove_total, t2_verify_total);
+    num_gate_before = get_num_gate_before(exp_iter);
+    num_gate_after  = get_num_gate_with_commit(exp_iter, num_commit);
+    printf("num_commit = %8lu num_gate_before = %8lu num_gate_after = %8lu\n", num_commit, num_gate_before, num_gate_after);
+
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, num_commit);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_origin<FieldT, ppT, HType>(exp_iter, circuit_arguments);
     }
+    effeciency_print_no_cp();
+
+    libff::clear_profiling_counters();
+    circuit_arguments = generate_circuit_size_arguments(exp_iter, 0);
+    for (size_t i = 0; i < repeat; i++) {
+      ILC_test_with_com_input<FieldT, ppT, HType>(exp_iter, circuit_arguments);
+    }
+    effeciency_print_cp();
+  }
 }
 #endif

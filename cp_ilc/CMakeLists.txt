@@ -1,9 +1,6 @@
 set(CMAKE_CXX_STANDARD 14)
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
-set(CMAKE_BUILD_TYPE "Release")
 
 
-# add_definitions(-DCURVE=BN128)
 find_package(OpenSSL REQUIRED)
 
 # include_directories(/usr/local/include)
@@ -19,6 +16,7 @@ add_executable(
     bootle17
 
     main.cpp
+    ./src/utils.cpp
 )
 target_link_libraries(
     bootle17 
@@ -59,6 +57,12 @@ target_link_libraries(
     ff
     gmpxx
     OpenSSL::Crypto
+)
+
+add_executable(
+    optimal_arguments
+    
+    optimal_arguments.cpp
 )
 
 add_custom_target(bootle_check COMMAND ${CMAKE_CTEST_COMMAND})
